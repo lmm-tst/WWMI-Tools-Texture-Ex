@@ -90,6 +90,7 @@ class BufferSemantic:
     def get_format(self):
         return self.format.get_format()
 
+
 @dataclass
 class BufferElementLayout:
     semantics: List[BufferSemantic]
@@ -140,6 +141,59 @@ class BufferElementLayout:
             ret += 'element[%i]:\n' % i
             ret += semantic.to_string()
         return ret
+
+
+class MigotoFmt:
+    def __init__(self, fmt_file: io.IOBase):
+        vb_stride = 0
+        vb_semantics = []
+
+        converters = {
+            'SemanticName': lambda value: Semantic(value),
+            'SemanticIndex': lambda value: int(value),
+            'Format': lambda value: DXGIFormat(value.replace('DXGI_FORMAT_', '')),
+            'AlignedByteOffset': lambda value: int(value),
+        }
+
+        element = None
+
+        for line in map(str.strip, fmt_file):
+            data = line.split(':')
+            if len(data) != 2:
+                continue
+            data = list(map(str.strip, data))
+            key, value = data[0], data[1]
+
+            if line.startswith('stride'):
+                vb_stride = int(value)
+            elif line.startswith('format') and element is None:
+                ib_format = DXGIFormat(value.replace('DXGI_FORMAT_', ''))
+                if ib_format == DXGIFormat.R8_UINT:
+                    ib_format = DXGIFormat.R8G8B8_UINT
+                elif ib_format == DXGIFormat.R16_UINT:
+                    ib_format = DXGIFormat.R16G16B16_UINT
+                elif ib_format == DXGIFormat.R32_UINT:
+                    ib_format = DXGIFormat.R32G32B32_UINT
+                self.ib_layout = BufferElementLayout([BufferSemantic(AbstractSemantic(Semantic.Index, 0), ib_format)])
+            elif line.startswith('element'):
+                if element is not None:
+                    if len(element) == 4:
+                        vb_semantics.append(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format']))
+                    elif len(element) > 0:
+                        raise ValueError(f'malformed buffer element format: {element}')
+                element = {}
+            else:
+                for search_key, converter in converters.items():
+                    if key.startswith(search_key):
+                        element[search_key] = converter(value)
+                        break
+        if len(element) == 4:
+            vb_semantics.append(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format']))
+
+        self.vb_layout = BufferElementLayout(vb_semantics)
+
+        if vb_stride != self.vb_layout.stride:
+            raise ValueError(f'vb buffer layout format stride mismatch: {vb_stride} != {self.vb_layout.stride}')
 
 
 class BufferElement:

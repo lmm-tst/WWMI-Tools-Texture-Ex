@@ -12,4 +12,7 @@ def get_blend_file_path() -> Path:
 
 
 def resolve_path(path) -> Path:
-    return Path(bpy.path.abspath(path)).resolve()
+    abspath = bpy.path.abspath(path)
+    if abspath is None:
+        abspath = path
+    return Path(abspath).resolve()
