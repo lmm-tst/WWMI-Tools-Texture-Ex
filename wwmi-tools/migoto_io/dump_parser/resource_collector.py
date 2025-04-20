@@ -3,7 +3,7 @@ import time
 from typing import Union, List, Dict
 from dataclasses import dataclass
 
-from ..buffers.byte_buffer import ByteBuffer, BufferElementLayout, IndexBuffer
+from ..data_model.byte_buffer import ByteBuffer, BufferLayout, IndexBuffer
 
 from .filename_parser import SlotType, ShaderType, SlotId, ResourceDescriptor
 
@@ -23,7 +23,7 @@ class Source:
 @dataclass
 class DataMap:
     sources: List[Source]
-    layout: BufferElementLayout = None
+    layout: BufferLayout = None
 
 
 @dataclass

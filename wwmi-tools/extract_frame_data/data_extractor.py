@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Union, List, Dict
 from enum import Enum
 
-from ..migoto_io.buffers.byte_buffer import ByteBuffer, IndexBuffer, BufferElementLayout, BufferSemantic, AbstractSemantic, Semantic
+from ..migoto_io.data_model.byte_buffer import ByteBuffer, IndexBuffer, BufferLayout, BufferSemantic, AbstractSemantic, Semantic
 from ..migoto_io.dump_parser.log_parser import CallParameters
 from ..migoto_io.dump_parser.filename_parser import ResourceDescriptor
 from ..migoto_io.dump_parser.resource_collector import ShaderCallBranch

@@ -1,12 +1,10 @@
-
-import os
-import json
+import hashlib
 
 from dataclasses import dataclass, field
 from typing import List, Dict
 from pathlib import Path
 
-from ..migoto_io.buffers.dxgi_format import DXGIFormat
+from ..migoto_io.data_model.dxgi_format import DXGIFormat
 from ..migoto_io.dump_parser.filename_parser import ResourceDescriptor
 
 from .shapekey_builder import ShapeKeys
@@ -69,6 +67,13 @@ class OutputBuilder:
 
     def filter_textures(self, mesh_object):
 
+        garbage_list = [
+            '980666bd245e94c32ee0ed46435b122d41ef3b7c13f9e389eb4d56916ab7f611',  # Stars mask
+            '42daba7e8702346c175c69840d4530d6798f0a4e8e2504b0e9c5969fe3c8b5af',  # Golden Orb mask
+            '99a43e3d7ef0ecf4cc5753ba306326a44d9b8006e4d0f0728d941fb02bd0774b',  # Gray Wave mask
+            # '2e4e6aecbfdabc7b292a55e9dab133ed3d0192145b44f6ea72c19f9dbd2a9033',  # Eye mask
+        ]
+
         num_slot_hash_entries = {}
 
         for component in mesh_object.components:
@@ -106,10 +111,15 @@ class OutputBuilder:
                         if num_slot_hash_entries[slot_hash] == num_components:
                             continue
 
+                # Exclude known garbage textures
+                with open(texture.path, 'rb') as f:
+                    data_hash = hashlib.sha256(f.read()).hexdigest()
+                    if data_hash in garbage_list:
+                        continue
+
                 textures.append(texture)
 
             component.textures = textures
-
 
     @staticmethod
     def build_metadata(mesh_object, shapekeys):
@@ -162,9 +172,3 @@ class OutputBuilder:
         fmt += vb.layout.to_string()
 
         return fmt
-
-
-
-
-
-

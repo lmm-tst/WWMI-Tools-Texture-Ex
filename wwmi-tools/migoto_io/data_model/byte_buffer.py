@@ -1,10 +1,10 @@
-
 import io
 import copy
 import textwrap
 import math
+import numpy
 
-from typing import Union, List
+from typing import Union, List, Optional, Dict
 from dataclasses import dataclass
 from enum import Enum
 
@@ -15,6 +15,7 @@ class Semantic(Enum):
     VertexId = 'VERTEXID'
     Index = 'INDEX'
     Tangent = 'TANGENT'
+    BitangentSign = 'BITANGENTSIGN'
     Normal = 'NORMAL'
     TexCoord = 'TEXCOORD'
     Color = 'COLOR'
@@ -33,53 +34,55 @@ class Semantic(Enum):
 
 @dataclass
 class AbstractSemantic:
-    semantic: Semantic
+    enum: Semantic
     index: int = 0
 
     def __init__(self, semantic, semantic_index=0):
-        self.semantic = semantic
+        self.enum = semantic
         self.index = semantic_index
 
     def __hash__(self):
-        return hash((self.semantic, self.index))
+        return hash((self.enum, self.index))
 
     def __str__(self):
-        return f'{self.semantic}_{self.index}'
+        return f'{self.enum}_{self.index}'
 
     def __repr__(self):
-        return f'{self.semantic}_{self.index}'
+        return f'{self.enum}_{self.index}'
     
     def get_name(self):
-        name = self.semantic.value
+        name = self.enum.value
         if self.index > 0:
             name += str(self.index)
-        if self.semantic == Semantic.TexCoord:
+        if self.enum == Semantic.TexCoord:
             name += '.xy'
         return name
 
 
 @dataclass
 class BufferSemantic:
-    semantic: AbstractSemantic
+    abstract: AbstractSemantic
     format: DXGIFormat
     stride: int = 0
     offset: int = 0
+    converter: callable = None
+    name: Optional[str] = None
 
     def __post_init__(self):
         # Calculate byte stride
         if self.stride == 0:
             self.stride = self.format.byte_width
-
+        
     def __hash__(self):
-        return hash((self.semantic, self.format.format, self.stride, self.offset))
+        return hash((self.abstract, self.format.format, self.stride, self.offset))
 
     def __repr__(self):
-        return f'{self.semantic} ({self.format.format} size={self.stride} offset={self.offset})'
+        return f'{self.abstract} ({self.format.format} stride={self.stride} offset={self.offset})'
 
     def to_string(self, indent=2):
         return textwrap.indent(textwrap.dedent(f'''
-            SemanticName: {self.semantic.semantic}
-            SemanticIndex: {self.semantic.index}
+            SemanticName: {self.abstract.enum}
+            SemanticIndex: {self.abstract.index}
             Format: {self.format.format}
             InputSlot: 0
             AlignedByteOffset: {self.offset}
@@ -90,9 +93,15 @@ class BufferSemantic:
     def get_format(self):
         return self.format.get_format()
 
+    def get_name(self):
+        return self.name if self.name else self.abstract.get_name()
+
+    def get_numpy_type(self):
+        return self.format.get_numpy_type(self.stride)
+    
 
 @dataclass
-class BufferElementLayout:
+class BufferLayout:
     semantics: List[BufferSemantic]
     stride: int = 0
     force_stride: bool = False
@@ -114,23 +123,24 @@ class BufferElementLayout:
             if semantic not in groups:
                 groups[semantic] = 0
                 continue
-            if semantic.semantic.index == 0:
+            if semantic.abstract.index == 0:
                 groups[semantic] += 1
-                semantic.semantic.index = groups[semantic]
+                semantic.abstract.index = groups[semantic]
 
-    def get_element(self, semantic):
+    def get_element(self, abstract: AbstractSemantic):
         for element in self.semantics:
-            if semantic == element.semantic:
+            if abstract == element.abstract:
                 return element
 
-    def add_element(self, semantic):
+    def add_element(self, semantic: BufferSemantic):
+        if self.get_element(semantic.abstract) is not None:
+            return
         semantic = copy.deepcopy(semantic)
         semantic.offset = self.stride
         self.semantics.append(semantic)
         self.stride += semantic.stride
 
     def merge(self, layout):
-
         for semantic in layout.semantics:
             if not self.get_element(semantic):
                 self.add_element(semantic)
@@ -141,6 +151,95 @@ class BufferElementLayout:
             ret += 'element[%i]:\n' % i
             ret += semantic.to_string()
         return ret
+
+
+class NumpyBuffer:
+    layout: BufferLayout
+    data: numpy.ndarray
+
+    def __init__(self, layout: BufferLayout, data: Optional[numpy.ndarray] = None, size = 0):
+        self.set_layout(layout)
+        self.set_data(data, size)
+
+    def set_layout(self, layout: BufferLayout):
+        self.layout = layout
+
+    def set_data(self, data: Optional[numpy.ndarray], size = 0):
+        if data is not None:
+            self.data = data
+        elif size > 0:
+            self.data = numpy.zeros(size, dtype=self.make_layout_numpy_type())
+
+    def set_field(self, field: str, data: Optional[numpy.ndarray]):
+        self.data[field] = data
+
+    def get_data(self, indices: Optional[numpy.ndarray] = None) -> numpy.ndarray:
+        if indices is None:
+            return self.data
+        else:
+            return self.data[indices]
+
+    def get_field(self, field: str) -> numpy.ndarray:
+        return self.data[field]
+
+    def make_layout_numpy_type(self, layout = None):
+        layout =  self.layout if layout is None else layout
+        dtype = numpy.dtype([])
+        for semantic in layout.semantics:
+            dtype = numpy.dtype(dtype.descr + [(semantic.abstract.get_name(), (semantic.get_numpy_type()))])
+        return dtype
+
+    def remove_duplicates(self, keep_order = True):
+        if keep_order:
+            _, unique_index = numpy.unique(self.data, return_index=True)
+            self.data = self.data[numpy.sort(unique_index)]
+        else:
+            self.data = numpy.unique(self.data)
+
+    def import_semantic_data(self,
+                             data: numpy.ndarray, 
+                             semantic: Union[BufferSemantic, int], 
+                             semantic_converters: Optional[List[callable]] = None,
+                             format_converters: Optional[List[callable]] = None):
+        if isinstance(semantic, int):
+            semantic = self.layout.semantics[semantic]
+        current_semantic = self.layout.get_element(semantic.abstract)
+        if current_semantic is None:
+            raise ValueError(f'NumpyBuffer is missing {semantic.abstract} semantic data!')
+        if semantic_converters is not None:
+            for data_converter in semantic_converters:
+                data = data_converter(data)
+        if current_semantic.format != semantic.format:
+            data = current_semantic.format.type_encoder(data)
+        if format_converters is not None:
+            for data_converter in format_converters:
+                data = data_converter(data)
+        self.set_field(current_semantic.get_name(), data)
+
+    def import_data(self,
+                    data: 'NumpyBuffer',
+                    semantic_converters: Dict[AbstractSemantic, List[callable]],
+                    format_converters: Dict[AbstractSemantic, List[callable]]):
+        
+        for buffer_semantic in self.layout.semantics:
+
+            data_semantic = data.layout.get_element(buffer_semantic.abstract)
+
+            if data_semantic is None:
+                continue
+            field_data = data.get_field(buffer_semantic.get_name())
+
+            self.import_semantic_data(
+                field_data, 
+                data_semantic,
+                semantic_converters.get(buffer_semantic.abstract, []),
+                format_converters.get(buffer_semantic.abstract, []))
+
+    def get_bytes(self):
+        return self.data.tobytes()
+
+    def __len__(self):
+        return len(self.data)
 
 
 class MigotoFmt:
@@ -174,7 +273,7 @@ class MigotoFmt:
                     ib_format = DXGIFormat.R16G16B16_UINT
                 elif ib_format == DXGIFormat.R32_UINT:
                     ib_format = DXGIFormat.R32G32B32_UINT
-                self.ib_layout = BufferElementLayout([BufferSemantic(AbstractSemantic(Semantic.Index, 0), ib_format)])
+                self.ib_layout = BufferLayout([BufferSemantic(AbstractSemantic(Semantic.Index, 0), ib_format)])
             elif line.startswith('element'):
                 if element is not None:
                     if len(element) == 4:
@@ -190,7 +289,7 @@ class MigotoFmt:
         if len(element) == 4:
             vb_semantics.append(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format']))
 
-        self.vb_layout = BufferElementLayout(vb_semantics)
+        self.vb_layout = BufferLayout(vb_semantics)
 
         if vb_stride != self.vb_layout.stride:
             raise ValueError(f'vb buffer layout format stride mismatch: {vb_stride} != {self.vb_layout.stride}')
@@ -222,12 +321,12 @@ class BufferElement:
         if isinstance(semantic, AbstractSemantic):
             semantic = self.layout.get_element(semantic)
         data_bytes = self.get_bytes(semantic)
-        return semantic.format.decoder(data_bytes)
+        return semantic.format.decoder(data_bytes).tolist()
 
     def set_value(self, semantic, value):
         if isinstance(semantic, AbstractSemantic):
             semantic = self.layout.get_element(semantic)
-        self.set_bytes(semantic, semantic.format.encoder(value))
+        self.set_bytes(semantic, semantic.format.encoder(value).tobytes())
 
     def get_all_bytes(self):
         data_bytes = bytearray()
@@ -248,15 +347,15 @@ class ByteBuffer:
             self.from_bytes(data_bytes)
 
     def validate(self):
-        num_elements = {}
+        result = {}
         for semantic in self.layout.semantics:
-            num_elements[semantic] = len(self.data[semantic]) / semantic.stride
-        if min(num_elements.values()) != max(num_elements.values()):
-            num_elements = ', '.join([f'{k.semantic}: {v}' for k, v in num_elements.items()])
-            raise ValueError(f'elements count mismatch in buffers: {num_elements}')
+            result[semantic] = len(self.data[semantic]) / semantic.stride
+        if min(result.values()) != max(result.values()):
+            result = ', '.join([f'{k.abstract}: {v}' for k, v in result.items()])
+            raise ValueError(f'elements count mismatch in buffers: {result}')
         if len(self.layout.semantics) != len(self.data):
             raise ValueError(f'data structure must match buffer layout!')
-        self.num_elements = int(min(num_elements.values()))
+        self.num_elements = int(min(result.values()))
 
     def update_layout(self, layout):
         self.layout = layout
@@ -328,8 +427,8 @@ class ByteBuffer:
             if src_semantic.format == dst_semantic.format:
                 self.data[dst_semantic] = src_byte_buffer.data[src_semantic]
             else:
-                src_values = src_semantic.format.decoder(src_byte_buffer.data[src_semantic])
-                self.data[dst_semantic] = dst_semantic.format.encoder(src_values)
+                src_values = src_semantic.format.decoder(src_byte_buffer.data[src_semantic]).tolist()
+                self.data[dst_semantic] = dst_semantic.format.encoder(src_values).tobytes()
 
         self.validate()
 
@@ -348,7 +447,7 @@ class ByteBuffer:
         if isinstance(semantic, AbstractSemantic):
             semantic = self.layout.get_element(semantic)
         data_bytes = self.get_bytes(semantic)
-        return semantic.format.decoder(data_bytes)
+        return semantic.format.decoder(data_bytes).tolist()
 
     def set_bytes(self, semantic, data_bytes):
         if isinstance(semantic, AbstractSemantic):
@@ -359,7 +458,7 @@ class ByteBuffer:
     def set_values(self, semantic, values):
         if isinstance(semantic, AbstractSemantic):
             semantic = self.layout.get_element(semantic)
-        self.set_bytes(semantic, semantic.format.encoder(values))
+        self.set_bytes(semantic, semantic.format.encoder(values).tobytes())
 
     @staticmethod
     def map_semantics(src_byte_buffer, dst_byte_buffer, semantic_map=None, skip_missing=False):
@@ -378,7 +477,7 @@ class ByteBuffer:
                     src_semantic = src_byte_buffer.layout.get_element(src_semantic)
                 if src_semantic not in src_byte_buffer.layout.semantics:
                     if not skip_missing:
-                        raise ValueError(f'source buffer has no {src_semantic.semantic} semantic')
+                        raise ValueError(f'source buffer has no {src_semantic.abstract} semantic')
                     continue
                 # Ensure destination semantic location in destination buffer
                 dst_semantic = src_semantic
@@ -386,7 +485,7 @@ class ByteBuffer:
                     dst_semantic = dst_byte_buffer.layout.get_element(dst_semantic)
                 if dst_semantic not in dst_byte_buffer.layout.semantics:
                     if not skip_missing:
-                        raise ValueError(f'destination buffer has no {dst_semantic.semantic} semantic')
+                        raise ValueError(f'destination buffer has no {dst_semantic.abstract} semantic')
                     continue
                 # Add semantic to verified map
                 verified_semantic_map[src_semantic] = dst_semantic
@@ -394,10 +493,10 @@ class ByteBuffer:
             # If there is no semantics map provided, map everything by default
             for src_semantic in src_byte_buffer.layout.semantics:
                 # Locate matching semantic in destination buffer
-                dst_semantic = dst_byte_buffer.layout.get_element(src_semantic.semantic)
+                dst_semantic = dst_byte_buffer.layout.get_element(src_semantic.abstract)
                 if dst_semantic is None:
                     if not skip_missing:
-                        raise ValueError(f'destination buffer has no {src_semantic.semantic} semantic')
+                        raise ValueError(f'destination buffer has no {src_semantic.abstract} semantic')
                     continue
                 verified_semantic_map[src_semantic] = dst_semantic
 
@@ -458,7 +557,7 @@ class IndexBuffer(ByteBuffer):
             assert (len(face) == 3)
             indices.extend(list(face))
         assert (len(indices) == self.index_count)
-        data_bytes = self.layout.semantics[0].format.encoder(indices)
+        data_bytes = self.layout.semantics[0].format.encoder(indices).tobytes()
         self.from_bytes(data_bytes)
         assert (self.num_elements * 3 == self.index_count)
 

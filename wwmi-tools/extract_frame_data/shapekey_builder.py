@@ -2,8 +2,8 @@ from dataclasses import dataclass, field
 
 from typing import List, Dict
 
-from ..migoto_io.buffers.dxgi_format import DXGIFormat
-from ..migoto_io.buffers.byte_buffer import ByteBuffer, BufferElementLayout, BufferSemantic, AbstractSemantic, Semantic
+from ..migoto_io.data_model.dxgi_format import DXGIFormat
+from ..migoto_io.data_model.byte_buffer import ByteBuffer, BufferLayout, BufferSemantic, AbstractSemantic, Semantic
 
 from .data_extractor import ShapeKeyData, DrawData
 
@@ -41,7 +41,7 @@ class ShapeKeys:
         if len(shapekey_ids) == 0:
             return None
 
-        layout = BufferElementLayout([
+        layout = BufferLayout([
             BufferSemantic(AbstractSemantic(Semantic.ShapeKey, shapekey_id), DXGIFormat.R16G16B16_FLOAT)
             for shapekey_id in shapekey_ids
         ])
@@ -53,7 +53,7 @@ class ShapeKeys:
             indexed_vertex_shapekeys = self.indexed_shapekeys.get(vertex_id, None)
             element_id = vertex_id - vertex_offset
             for semantic in shapekey_buffer.layout.semantics:
-                shapekey_id = semantic.semantic.index
+                shapekey_id = semantic.abstract.index
                 if indexed_vertex_shapekeys is None or shapekey_id not in indexed_vertex_shapekeys:
                     shapekey_buffer.get_element(element_id).set_value(semantic, [0, 0, 0])
                 else:
@@ -79,27 +79,29 @@ class ShapeKeyBuilder:
             vertex_offsets = shapekey_data.shapekey_vertex_offset_buffer.get_values(AbstractSemantic(Semantic.RawData))
 
             # Detect last non-zero entry in the vertex_offsets buffer consisting of 3 floats and 3 zeroes per row
-            vertex_offsets_len = int(len(vertex_offsets) / 6)
-            last_data_entry_id = vertex_offsets_len - 1
-            for entry_id in reversed(range(vertex_offsets_len)):
-                vertex_offset = vertex_offsets[entry_id * 6:entry_id * 6 + 6]
-                if any(v != 0 for v in vertex_offset):
-                    break
-                last_data_entry_id = entry_id
+            # vertex_offsets_len = int(len(vertex_offsets) / 6)
+            # last_data_entry_id = vertex_offsets_len - 1
+            # for entry_id in reversed(range(vertex_offsets_len)):
+            #     vertex_offset = vertex_offsets[entry_id * 6:entry_id * 6 + 6]
+            #     if any(v != 0 for v in vertex_offset):
+            #         break
+            #     last_data_entry_id = entry_id
 
             # Original buffer doesn't contain offset for 129th group, but we'll need it for the loop below
-            last_shapekey_offset = shapekey_offsets[-1]
-            if last_shapekey_offset > last_data_entry_id:
-                shapekey_offsets.append(last_shapekey_offset)
-            else:
-                shapekey_offsets.append(last_data_entry_id + 1)
+            # last_shapekey_offset = shapekey_offsets[-1]
+            # if last_shapekey_offset > last_data_entry_id:
+            #     shapekey_offsets.append(last_shapekey_offset)
+            # else:
+            #     shapekey_offsets.append(last_data_entry_id + 1)
+
+            last_data_entry_id = shapekey_offsets[-1]
 
             # Process shapekey entries, we'll build both VertexID and ShapeKeyID based outputs for fast indexing
             shapekeys_index = []
             indexed_shapekeys = {}
             for shapekey_id, first_entry_id in enumerate(shapekey_offsets):
                 # Stop processing if next entries have no data
-                if first_entry_id > last_data_entry_id:
+                if first_entry_id >= last_data_entry_id:
                     break
                 # Process all entries from current shapekey offset 'till offset of the next shapekey
                 entries = {}

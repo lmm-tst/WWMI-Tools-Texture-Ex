@@ -3,7 +3,7 @@ from typing import Union, List, Dict
 
 from dataclasses import dataclass
 
-from ..buffers.byte_buffer import ByteBuffer, IndexBuffer
+from ..data_model.byte_buffer import ByteBuffer, IndexBuffer
 
 from .filename_parser import ShaderType, SlotType, SlotId, CallDescriptor, ResourceDescriptor
 from .dict_filter import DictFilter, FilterCondition, Filter

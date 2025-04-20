@@ -11,8 +11,8 @@ from collections import OrderedDict
 
 from ..migoto_io.blender_interface.utility import *
 
-from ..migoto_io.buffers.dxgi_format import DXGIFormat
-from ..migoto_io.buffers.byte_buffer import BufferElementLayout, BufferSemantic, AbstractSemantic, Semantic, ByteBuffer
+from ..migoto_io.data_model.dxgi_format import DXGIFormat
+from ..migoto_io.data_model.byte_buffer import BufferLayout, BufferSemantic, AbstractSemantic, Semantic, ByteBuffer
 
 from ..migoto_io.dump_parser.filename_parser import ShaderType, SlotType, SlotId
 from ..migoto_io.dump_parser.dump_parser import Dump
@@ -32,7 +32,7 @@ class Configuration:
     # dump_dir_path: str
     shader_data_pattern: Dict[str, ShaderMap]
     shader_resources: Dict[str, DataMap]
-    output_vb_layout: BufferElementLayout
+    output_vb_layout: BufferLayout
 
 
 # In WuWa VB is dynamically calculated by dedicated compute shaders (aka Pose CS)
@@ -78,19 +78,19 @@ configuration = Configuration(
         'SHAPEKEY_OFFSET_BUFFER': DataMap([
                 Source('SHAPEKEY_CS_1', ShaderType.Compute, SlotType.ConstantBuffer, SlotId(0)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.RawData), DXGIFormat.R32_UINT),
             ])),
         'SHAPEKEY_VERTEX_ID_BUFFER': DataMap([
                 Source('SHAPEKEY_CS_1', ShaderType.Compute, SlotType.Texture, SlotId(0)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.RawData), DXGIFormat.R32_UINT),
             ])),
         'SHAPEKEY_VERTEX_OFFSET_BUFFER': DataMap([
                 Source('SHAPEKEY_CS_1', ShaderType.Compute, SlotType.Texture, SlotId(1)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.RawData), DXGIFormat.R16G16B16_FLOAT),
             ])),
 
@@ -107,7 +107,7 @@ configuration = Configuration(
         'SKELETON_DATA_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Vertex, SlotType.ConstantBuffer, SlotId(4)),
             ],
-            BufferElementLayout(
+            BufferLayout(
                 semantics=[
                     BufferSemantic(AbstractSemantic(Semantic.RawData, 0), DXGIFormat.R32_FLOAT, stride=48),
                 ],
@@ -116,14 +116,14 @@ configuration = Configuration(
         'POSE_CB': DataMap([
                 Source('DRAW_VS', ShaderType.Vertex, SlotType.ConstantBuffer, SlotId(0)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.RawData), DXGIFormat.R32G32B32A32_UINT)
             ])),
 
         'IB_BUFFER_TXT': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.IndexBuffer, file_ext='txt')
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.Index, 0), DXGIFormat.R16G16B16_UINT),
             ])
         ),
@@ -131,20 +131,20 @@ configuration = Configuration(
         'POSITION_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(0)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.Position, 0), DXGIFormat.R32G32B32_FLOAT),
             ])),
         'VECTOR_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(1)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.Tangent, 0), DXGIFormat.R8G8B8A8_SNORM),
                 BufferSemantic(AbstractSemantic(Semantic.Normal, 0), DXGIFormat.R8G8B8A8_SNORM),
             ])),
         'TEXCOORD_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(2), file_ext='buf'),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.TexCoord, 0), DXGIFormat.R16G16_FLOAT),
                 BufferSemantic(AbstractSemantic(Semantic.Color, 1), DXGIFormat.R16G16_UNORM),
                 BufferSemantic(AbstractSemantic(Semantic.TexCoord, 1), DXGIFormat.R16G16_FLOAT),
@@ -153,13 +153,13 @@ configuration = Configuration(
         'COLOR_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(3), file_ext='buf'),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.Color, 0), DXGIFormat.R8G8B8A8_UNORM),
             ])),
         'BLEND_BUFFER': DataMap([
                 Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(4)),
             ],
-            BufferElementLayout([
+            BufferLayout([
                 BufferSemantic(AbstractSemantic(Semantic.Blendindices, 0), DXGIFormat.R8G8B8A8_UINT),
                 BufferSemantic(AbstractSemantic(Semantic.Blendweight, 0), DXGIFormat.R8G8B8A8_UNORM),
             ], force_stride=True)),
@@ -175,7 +175,7 @@ configuration = Configuration(
         'TEXTURE_8': DataMap([Source('DRAW_VS', ShaderType.Pixel, SlotType.Texture, SlotId(8), ignore_missing=True)]),
         
     },
-    output_vb_layout=BufferElementLayout([
+    output_vb_layout=BufferLayout([
         BufferSemantic(AbstractSemantic(Semantic.Position, 0), DXGIFormat.R32G32B32_FLOAT),
         BufferSemantic(AbstractSemantic(Semantic.Tangent, 0), DXGIFormat.R8G8B8A8_SNORM),
         BufferSemantic(AbstractSemantic(Semantic.Normal, 0), DXGIFormat.R8G8B8A8_SNORM),

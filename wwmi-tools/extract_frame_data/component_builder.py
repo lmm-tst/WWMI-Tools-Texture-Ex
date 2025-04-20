@@ -6,7 +6,7 @@ from typing import List, Dict
 from pathlib import Path
 from collections import OrderedDict
 
-from ..migoto_io.buffers.byte_buffer import ByteBuffer, IndexBuffer, BufferElementLayout, BufferSemantic, AbstractSemantic, Semantic
+from ..migoto_io.data_model.byte_buffer import ByteBuffer, IndexBuffer, BufferLayout, BufferSemantic, AbstractSemantic, Semantic
 from ..migoto_io.dump_parser.filename_parser import ResourceDescriptor
 
 from .data_extractor import ShapeKeyData, DrawData
@@ -72,7 +72,7 @@ class MeshObject:
             draw_data=draw_data,
         ))
         
-    def build_components(self, vb_layout: BufferElementLayout, shapekeys: Dict[str, ShapeKeys]):
+    def build_components(self, vb_layout: BufferLayout, shapekeys: Dict[str, ShapeKeys]):
         self.verify()
         self.components_data.sort(key=lambda data: data.draw_data.vertex_offset, reverse=False)
         self.import_shapekey_data(shapekeys)
@@ -100,7 +100,7 @@ class MeshObject:
         
         self.shapekey_data = shapekeys.get(self.shapekey_hash, None)
 
-    def build_component(self, draw_data: DrawData, vb_layout: BufferElementLayout):
+    def build_component(self, draw_data: DrawData, vb_layout: BufferLayout):
         """
         Compiles component data from multiple sources into single export-optimized object
         """
@@ -213,7 +213,7 @@ class MeshObject:
 @dataclass
 class ComponentBuilder:
     # Input
-    output_vb_layout: BufferElementLayout
+    output_vb_layout: BufferLayout
     shader_hashes: Dict[str, str]
     shapekeys: Dict[str, ShapeKeys]
     draw_data: Dict[tuple, DrawData]
