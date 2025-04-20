@@ -1,4 +1,5 @@
 import re
+import bpy
 
 from typing import List, Dict, Union
 from dataclasses import dataclass, field
@@ -53,7 +54,7 @@ class MergedObject:
 @dataclass
 class ObjectMerger:
     # Input
-    context: bpy.context
+    context: bpy.types.Context
     extracted_object: ExtractedObject
     ignore_hidden_objects: bool
     ignore_muted_shape_keys: bool
@@ -179,18 +180,11 @@ class ObjectMerger:
 
         rename_object(obj, 'TEMP_EXPORT_OBJECT')
 
-        # We'll skip Blender weight normalizer in favor of custom 8-bit friendly normalizer that is applied to weight data later
-        # normalize_all_weights(self.context, obj)
-
         deselect_all_objects()
         select_object(obj)
         set_active_object(bpy.context, obj)
 
         mesh = obj.evaluated_get(self.context.evaluated_depsgraph_get()).to_mesh()
-        
-        mesh.calc_tangents()
-        mesh.flip_normals()
-        mesh.calc_tangents()
 
         self.merged_object = MergedObject(
             object=obj,
