@@ -1,5 +1,5 @@
 import os
-import math
+import numpy
 import struct
 import itertools
 import time
@@ -23,10 +23,7 @@ from .buffers import VertexBuffer, IndexBuffer
 class Fatal(Exception): pass
 
 
-if bpy.app.version >= (2, 80):
-    vertex_color_layer_channels = 4
-else:
-    vertex_color_layer_channels = 3
+vertex_color_layer_channels = 4
 
 
 def load_3dmigoto_mesh_bin(operator, vb_paths, ib_paths, pose_path):
@@ -81,7 +78,21 @@ def load_3dmigoto_mesh(operator, paths):
     return vb, ib, os.path.basename(vb_paths[0]), pose_path
 
 
-def import_normals_step1(mesh, data, vertex_layers, translate_normal):
+def normal_import_translation(elem, flip):
+    unorm = elem.Format.endswith('_UNORM')
+    if unorm:
+        # Scale UNORM range 0:+1 to normal range -1:+1
+        if flip:
+            return lambda x: -(x*2.0 - 1.0)
+        else:
+            return lambda x: x*2.0 - 1.0
+    if flip:
+        return lambda x: -x
+    else:
+        return lambda x: x
+
+
+def import_normals_step1(mesh, data, vertex_layers, translate_normal, flip_mesh):
     # Ensure normals are 3-dimensional:
     # XXX: Assertion triggers in DOA6
     # if len(data[0]) == 4:
@@ -90,7 +101,7 @@ def import_normals_step1(mesh, data, vertex_layers, translate_normal):
     #         # operator.report({'WARNING'}, 'Normals are 4D, storing W coordinate in NORMAL.w vertex layer. Beware that some types of edits on this mesh may be problematic.')
     #         vertex_layers['NORMAL.w'] = [[x[3]] for x in data]
     normals = [tuple(map(translate_normal, (x[0], x[1], x[2]))) for x in data]
-
+    normals = [(-(2*flip_mesh-1)*x[0], x[1], x[2]) for x in normals]
     # To make sure the normals don't get lost by Blender's edit mode,
     # or mesh.update() we need to set custom normals in the loops, not
     # vertices.
@@ -103,25 +114,27 @@ def import_normals_step1(mesh, data, vertex_layers, translate_normal):
     # Comment from other import scripts:
     # Note: we store 'temp' normals in loops, since validate() may alter final mesh,
     #       we can only set custom lnors *after* calling it.
+    if bpy.app.version >= (4, 1):
+        return normals
     mesh.create_normals_split()
     for l in mesh.loops:
         l.normal[:] = normals[l.vertex_index]
+    return []
 
-
-def import_normals_step2(mesh):
+def import_normals_step2(mesh, flip_mesh):
     # Taken from import_obj/import_fbx
-    clnors = array('f', [0.0] * (len(mesh.loops) * 3))
+    clnors = numpy.zeros(len(mesh.loops)*3, dtype=numpy.float32)
     mesh.loops.foreach_get("normal", clnors)
-
+    clnors = clnors.reshape((-1, 3))
+    clnors[:, 0] *= -(2 * flip_mesh - 1)
     # Not sure this is still required with use_auto_smooth, but the other
     # importers do it, and at the very least it shouldn't hurt...
     mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
-
-    mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
-    mesh.use_auto_smooth = True  # This has a double meaning, one of which is to use the custom normals
+    mesh.normals_split_custom_set(clnors.tolist())
+    mesh.use_auto_smooth = True # This has a double meaning, one of which is to use the custom normals
     # XXX CHECKME: show_edge_sharp moved in 2.80, but I can't actually
     # recall what it does and have a feeling it was unimportant:
-    # mesh.show_edge_sharp = True
+    #mesh.show_edge_sharp = True
 
 
 def import_vertex_groups(mesh, obj, blend_indices, blend_weights, component):
@@ -150,7 +163,7 @@ def import_vertex_groups(mesh, obj, blend_indices, blend_weights, component):
                         obj.vertex_groups[vg_map[i]].add((vertex.index,), w, 'REPLACE')
 
 
-def import_shapekeys(mesh, obj, shapekeys):
+def import_shapekeys(mesh, obj, shapekeys, flip_mesh = False):
     if len(shapekeys.keys()) == 0:
         return
     
@@ -171,7 +184,10 @@ def import_shapekeys(mesh, obj, shapekeys):
         shapekey_data = shapekeys[shapekey_id]
         for vertex_id in range(len(obj.data.vertices)):
             position_offset = shapekey_data[vertex_id]
-            shapekey.data[vertex_id].co.x += position_offset[0]
+            if flip_mesh:
+                shapekey.data[vertex_id].co.x += -position_offset[0]
+            else:
+                shapekey.data[vertex_id].co.x += position_offset[0]
             shapekey.data[vertex_id].co.y += position_offset[1]
             shapekey.data[vertex_id].co.z += position_offset[2]
 
@@ -205,8 +221,8 @@ def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
             # themselves in the UV editor pane when they can see the unwrapped
             # mesh to compare it with the dumped textures:
             #
-            # path = textures.get(uv_layer, None)
-            # if path is not None:
+            #path = textures.get(uv_layer, None)
+            #if path is not None:
             #    image = load_image(path)
             #    for i in range(len(mesh.polygons)):
             #        mesh.uv_textures[uv_layer].data[i].image = image
@@ -214,16 +230,54 @@ def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
             # Can't find an easy way to flip the display of V in Blender, so
             # add an option to flip it on import & export:
             if flip_texcoord_v:
-                flip_uv = lambda uv: (uv[0], 1.0 - uv[1])
+                translate_uv = lambda uv: (uv[0], 1.0 - uv[1])
                 # Record that V was flipped so we know to undo it when exporting:
                 # obj['3DMigoto:' + uv_name] = {'flip_v': True}
             else:
-                flip_uv = lambda uv: uv
+                translate_uv = lambda uv: uv
 
             uvs = [[d[cmap[c]] for c in components] for d in data]
             for l in mesh.loops:
-                blender_uvs.data[l.index].uv = flip_uv(uvs[l.vertex_index])
+                blender_uvs.data[l.index].uv = translate_uv(uvs[l.vertex_index])
 
+def new_custom_attribute_int(mesh, layer_name):
+    # vertex_layers were dropped in 4.0. Looks like attributes were added in
+    # 3.0 (to confirm), so we could probably start using them or add a
+    # migration function on older versions as well
+    if bpy.app.version >= (4, 0):
+        mesh.attributes.new(name=layer_name, type='INT', domain='POINT')
+        return mesh.attributes[layer_name]
+    else:
+        mesh.vertex_layers_int.new(name=layer_name)
+        return mesh.vertex_layers_int[layer_name]
+
+def new_custom_attribute_float(mesh, layer_name):
+    if bpy.app.version >= (4, 0):
+        # TODO: float2 and float3 could be stored directly as 'FLOAT2' /
+        # 'FLOAT_VECTOR' types (in fact, UV layers in 4.0 show up in attributes
+        # using FLOAT2) instead of saving each component as a separate layer.
+        # float4 is missing though. For now just get it working equivelently to
+        # the old vertex layers.
+        mesh.attributes.new(name=layer_name, type='FLOAT', domain='POINT')
+        return mesh.attributes[layer_name]
+    else:
+        mesh.vertex_layers_float.new(name=layer_name)
+        return mesh.vertex_layers_float[layer_name]
+
+# TODO: Refactor to prefer attributes over vertex layers even on 3.x if they exist
+def custom_attributes_int(mesh):
+    if bpy.app.version >= (4, 0):
+        return { k: v for k,v in mesh.attributes.items()
+                if (v.data_type, v.domain) == ('INT', 'POINT') }
+    else:
+        return mesh.vertex_layers_int
+
+def custom_attributes_float(mesh):
+    if bpy.app.version >= (4, 0):
+        return { k: v for k,v in mesh.attributes.items()
+                if (v.data_type, v.domain) == ('FLOAT', 'POINT') }
+    else:
+        return mesh.vertex_layers_float
 
 # This loads unknown data from the vertex buffers as vertex layers
 def import_vertex_layers(mesh, obj, vertex_layers):
@@ -238,8 +292,7 @@ def import_vertex_layers(mesh, obj, vertex_layers):
                 layer_name = element_name
 
             if type(data[0][0]) == int:
-                mesh.vertex_layers_int.new(name=layer_name)
-                layer = mesh.vertex_layers_int[layer_name]
+                layer = new_custom_attribute_int(mesh, layer_name)
                 for v in mesh.vertices:
                     val = data[v.index][component]
                     # Blender integer layers are 32bit signed and will throw an
@@ -250,19 +303,21 @@ def import_vertex_layers(mesh, obj, vertex_layers):
                     else:
                         layer.data[v.index].value = struct.unpack('i', struct.pack('I', val))[0]
             elif type(data[0][0]) == float:
-                mesh.vertex_layers_float.new(name=layer_name)
-                layer = mesh.vertex_layers_float[layer_name]
+                layer = new_custom_attribute_float(mesh, layer_name)
                 for v in mesh.vertices:
                     layer.data[v.index].value = data[v.index][component]
             else:
                 raise Fatal('BUG: Bad layer type %s' % type(data[0][0]))
 
 
-def import_faces_from_ib(mesh, ib):
+def import_faces_from_ib(mesh, ib, flip_winding):
     mesh.loops.add(len(ib.faces) * 3)
     mesh.polygons.add(len(ib.faces))
-    mesh.loops.foreach_set('vertex_index', unpack_list(ib.faces))
-    mesh.polygons.foreach_set('loop_start', [x * 3 for x in range(len(ib.faces))])
+    if flip_winding:
+        mesh.loops.foreach_set('vertex_index', unpack_list(map(reversed, ib.faces)))
+    else:
+        mesh.loops.foreach_set('vertex_index', unpack_list(ib.faces))
+    mesh.polygons.foreach_set('loop_start', [x*3 for x in range(len(ib.faces))])
     mesh.polygons.foreach_set('loop_total', [3] * len(ib.faces))
 
 
@@ -276,21 +331,8 @@ def import_faces_from_vb(mesh, vb):
     mesh.polygons.foreach_set('loop_total', [3] * num_faces)
 
 
-def normal_import_translation(elem, flip):
-    unorm = elem.Format.endswith('_UNORM')
-    if unorm:
-        # Scale UNORM range 0:+1 to normal range -1:+1
-        if flip:
-            return lambda x: -(x*2.0 - 1.0)
-        else:
-            return lambda x: x*2.0 - 1.0
-    if flip:
-        return lambda x: -x
-    else:
-        return lambda x: x
 
-
-def import_vertices(mesh, vb, flip_normal=False):
+def import_vertices(mesh, vb, semantic_translations={}, flip_normal=False, flip_mesh=False):
     mesh.vertices.add(len(vb.vertices))
 
     seen_offsets = set()
@@ -300,6 +342,7 @@ def import_vertices(mesh, vb, flip_normal=False):
     vertex_layers = {}
     use_normals = False
     shapekeys = {}
+    normals = []
 
     for elem in vb.layout:
         if elem.InputSlotClass != 'per-vertex':
@@ -326,21 +369,21 @@ def import_vertices(mesh, vb, flip_normal=False):
             # Ensure positions are 3-dimensional:
             if len(data[0]) == 4:
                 if ([x[3] for x in data] != [1.0] * len(data)):
-                    # XXX: Leaving this fatal error in for now, as the meshes
-                    # it triggers on in DOA6 (skirts) lie about almost every
-                    # semantic and we cannot import them with this version of
-                    # the script regardless. Comment it out if you want to try
-                    # importing anyway and preserving the W coordinate in a
-                    # vertex group. It might also be possible to project this
-                    # back into 3D if we assume the coordinates are homogeneous
-                    # (i.e. divide XYZ by W), but that might be assuming too
-                    # much for a generic script.
+                    # XXX: There is a 4th dimension in the position, which may
+                    # be some artibrary custom data, or maybe something weird
+                    # is going on like using Homogeneous coordinates in a
+                    # vertex buffer. The meshes this triggers on in DOA6
+                    # (skirts) lie about almost every semantic and we cannot
+                    # import them with this version of the script regardless.
+                    # But perhaps in some cases it might still be useful to be
+                    # able to import as much as we can and just preserve this
+                    # unknown 4th dimension to export it later or have a game
+                    # specific script perform some operations on it - so we
+                    # store it in a vertex layer and warn the modder.
                     raise Fatal('Positions are 4D')
-                    # Occurs in some meshes in DOA6, such as skirts.
-                    # W coordinate must be preserved in these cases.
                     print('Positions are 4D, storing W coordinate in POSITION.w vertex layer')
                     vertex_layers['POSITION.w'] = [[x[3]] for x in data]
-            positions = [(x[0], x[1], x[2]) for x in data]
+            positions = [(-(2*flip_mesh-1)*x[0], x[1], x[2]) for x in data]
             mesh.vertices.foreach_set('co', unpack_list(positions))
         elif translated_elem_name.startswith('COLOR'):
             if len(data[0]) <= 3 or vertex_color_layer_channels == 4:
@@ -362,7 +405,7 @@ def import_vertices(mesh, vb, flip_normal=False):
         elif translated_elem_name == 'NORMAL':
             use_normals = True
             translate_normal = normal_import_translation(elem, flip_normal)
-            import_normals_step1(mesh, data, vertex_layers, translate_normal)
+            normals = import_normals_step1(mesh, data, vertex_layers, translate_normal, flip_mesh)
         elif translated_elem_name in ('TANGENT', 'BINORMAL'):
             #    # XXX: loops.tangent is read only. Not positive how to handle
             #    # this, or if we should just calculate it when re-exporting.
@@ -387,10 +430,10 @@ def import_vertices(mesh, vb, flip_normal=False):
             print('NOTICE: Storing unhandled semantic %s %s as vertex layer' % (elem.name, elem.Format))
             vertex_layers[elem.name] = data
 
-    return (blend_indices, blend_weights, texcoords, vertex_layers, use_normals, shapekeys)
+    return (blend_indices, blend_weights, texcoords, vertex_layers, use_normals, shapekeys, normals)
 
 
-def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, axis_forward='-Y', axis_up='Z'):
+def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, flip_winding=False, flip_mesh=False, flip_normal=False, axis_forward='-Y', axis_up='Z'):
     
     vb_paths, ib_paths, use_bin, pose_path = zip(*paths)
     fmt_path = vb_paths[0][1]
@@ -420,8 +463,15 @@ def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, a
     # obj['3DMigoto:VBStride'] = vb.layout.stride  # FIXME: Strides of multiple vertex buffers
     # obj['3DMigoto:FirstVertex'] = vb.first
 
+    if flip_mesh:
+        flip_winding = not flip_winding
+
+    # flip_mesh = True
+    flip_normal = False
+    # flip_winding = False
+
     if ib is not None:
-        import_faces_from_ib(mesh, ib)
+        import_faces_from_ib(mesh, ib, flip_winding)
         # Attach the index buffer layout to the object for later exporting.
         # if ib.format == "DXGI_FORMAT_R16_UINT":
         #     obj['3DMigoto:IBFormat'] = "DXGI_FORMAT_R32_UINT"
@@ -431,9 +481,10 @@ def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, a
     else:
         import_faces_from_vb(mesh, vb)
 
-    (blend_indices, blend_weights, texcoords, vertex_layers, use_normals, shapekeys) = import_vertices(mesh, vb, flip_normal=False)
+    (blend_indices, blend_weights, texcoords, vertex_layers, use_normals, shapekeys, normals) = import_vertices(
+        mesh, vb, semantic_translations={}, flip_normal=flip_normal, flip_mesh=flip_mesh)
 
-    mesh.flip_normals()
+    # mesh.flip_normals()
 
     import_uv_layers(mesh, obj, texcoords, flip_texcoord_v)
 
@@ -441,7 +492,7 @@ def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, a
 
     import_vertex_groups(mesh, obj, blend_indices, blend_weights, component)
 
-    import_shapekeys(mesh, obj, shapekeys)
+    import_shapekeys(mesh, obj, shapekeys, flip_mesh=flip_mesh)
 
     # Validate closes the loops so they don't disappear after edit mode and probably other important things:
     mesh.validate(verbose=False, clean_customdata=False)  # *Very* important to not remove lnors here!
@@ -450,8 +501,11 @@ def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, a
 
     # Must be done after validate step:
     if use_normals:
-        import_normals_step2(mesh)
-    else:
+        if bpy.app.version >= (4, 1):
+            mesh.normals_split_custom_set_from_vertices(normals)
+        else:
+            import_normals_step2(mesh, flip_mesh)
+    elif hasattr(mesh, 'calc_normals'): # Dropped in Blender 4.0
         mesh.calc_normals()
 
     return obj
@@ -471,7 +525,7 @@ def blender_import(operator, context, cfg):
         ib_path = fmt_path.with_suffix('.ib')
         vb_path = fmt_path.with_suffix('.vb')
 
-        obj = import_3dmigoto_vb_ib(operator, context, cfg, [((vb_path, fmt_path), (ib_path, fmt_path), True, None)])
+        obj = import_3dmigoto_vb_ib(operator, context, cfg, [((vb_path, fmt_path), (ib_path, fmt_path), True, None)], flip_mesh=cfg.mirror_mesh, flip_winding=True, flip_normal=True)
 
         link_object_to_collection(obj, col)
     
@@ -480,7 +534,9 @@ def blender_import(operator, context, cfg):
             # obj.rotation_euler[0] = math.radians(0)
             # obj.rotation_euler[2] = math.radians(180)
 
-            if cfg.mirror_mesh:
-                obj.scale = -0.01, 0.01, 0.01
-            else:
-                obj.scale = 0.01, 0.01, 0.01
+            # if cfg.mirror_mesh:
+            #     obj.scale = -0.01, 0.01, 0.01
+            # else:
+            #     obj.scale = 0.01, 0.01, 0.01
+
+            obj.scale = 0.01, 0.01, 0.01
