@@ -2,7 +2,7 @@ from enum import Enum, auto
 
 default_config = {
     'elif/else if': 'elif',         # Whether to use "else if" or "elif" for conditionals
-    'indent': '\t',                 # Character (or str) that will be used to indent
+    'indent': '    ',                 # Character (or str) that will be used to indent
     'indent_depth': 0,              # How many indents to start with
     'indent_section_body': False,   # Whether to indent the body of sections or not
     'indent_condition_body': True,  # Whether to indent the body of conditionals or not
