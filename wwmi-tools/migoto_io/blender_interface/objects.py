@@ -4,6 +4,7 @@ import bpy
 import bmesh
 
 from .collections import assert_collection, unhide_collection
+from .mesh import remove_mesh
 
 
 def assert_object(obj):
@@ -252,7 +253,11 @@ class OpenObjects:
 def join_objects(context, objects):
     if len(objects) == 1:
         return
+    unused_meshes = []
     with OpenObject(context, objects[0], mode='OBJECT'):
         for obj in objects[1:]:
+            unused_meshes.append(obj.data)
             select_object(obj)  
             bpy.ops.object.join()
+    for mesh in unused_meshes:
+        remove_mesh(mesh)
