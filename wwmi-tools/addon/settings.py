@@ -281,13 +281,13 @@ class WWMI_Settings(bpy.types.PropertyGroup):
     export_on_reload: BoolProperty(
         name="Export On Reload",
         description="Trigger mod export on addon reload. Useful for export debugging.",
-        default=True,
+        default=False,
     ) # type: ignore
 
     use_custom_template: BoolProperty(
         name="Use Custom Template",
         description="Use configured jinja2 template to build fully custom mod.ini.",
-        default=True,
+        default=False,
     ) # type: ignore
 
     custom_template_live_update: BoolProperty(
