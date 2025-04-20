@@ -1342,7 +1342,7 @@ def register():
     updater.repo = "WWMI-Tools"
     # updater.addon = # define at top of module, MUST be done first
     updater.website = "https://github.com/SpectrumQT/WWMI-Tools/releases"
-    updater.subfolder_path = ""
+    updater.subfolder_path = "wwmi-tools"
     updater.current_version = bl_info["version"]
     updater.verbose = True  # make False for production default
     updater.backup_current = True  # True by default
