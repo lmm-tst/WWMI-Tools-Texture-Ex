@@ -1,68 +1,41 @@
-
-from pathlib import Path
-
+#!/usr/bin/env python3
+from . import auto_load
 
 bl_info = {
     "name": "WWMI Tools",
-    "version": (0, 9, 0),
+    "version": (1, 0, 0),
     "wwmi_version": (0, 7, 0),
     "blender": (2, 80, 0),
-    "author": "SpectrumQT, DarkStarSword",
+    "author": "SpectrumQT, LeoTorreZ, SinsOfSeven, SilentNightSound, DarkStarSword",
     "location": "View3D > Sidebar > Tool Tab",
     "description": "Wuthering Waves modding toolkit",
     "category": "Object",
     "tracker_url": "https://github.com/SpectrumQT/WWMI-Tools",
 }
-
-
-def reload_package(module_dict_main):
-    def reload_package_recursive(current_dir, module_dict):
-        for path in current_dir.iterdir():
-            if "__init__" in str(path) or path.stem not in module_dict:
-                continue
-            if path.is_file() and path.suffix == ".py":
-                importlib.reload(module_dict[path.stem])
-            elif path.is_dir():
-                reload_package_recursive(path, module_dict[path.stem].__dict__)
-    reload_package_recursive(Path(__file__).parent, module_dict_main)
-
+auto_load.init()
 
 import bpy
-if "bpy" in locals():
-    import importlib
-    reload_package(locals())
+from .addon import settings
 
 
-from . import wwmi_tools
-
-
-classes = [
-    wwmi_tools.WWMI_Settings,
-    wwmi_tools.WWMI_Import,
-    wwmi_tools.WWMI_Export,
-    wwmi_tools.WWMI_ExtractFrameData,
-    wwmi_tools.WWMI_FillGapsInVertexGroups,
-    wwmi_tools.WWMI_RemoveUnusedVertexGroups,
-    wwmi_tools.WWMI_RemoveAllVertexGroups,
-    wwmi_tools.WWMI_ApplyModifierForObjectWithShapeKeysOperator,
-    wwmi_tools.WWMI_TOOLS_PT_UI_PANEL,
-]
-
+def trigger_mod_export():
+    if bpy.context.scene.wwmi_tools_settings.export_on_reload:
+        print('Triggered export on addon reload...')
+        bpy.ops.wwmi_tools.export_mod()
+    
 
 def register():
-    for cls in classes:
-        bpy.utils.register_class(cls)
+    auto_load.register()
 
-    bpy.types.Scene.wwmi_tools_settings = bpy.props.PointerProperty(type=wwmi_tools.WWMI_Settings)
-
+    bpy.types.Scene.wwmi_tools_settings = bpy.props.PointerProperty(type=settings.WWMI_Settings)
+    
+    # prefs = bpy.context.preferences.addons[__package__].preferences
+    bpy.app.timers.register(trigger_mod_export, first_interval=0.1)
 
 def unregister():
-    for cls in reversed(classes):
-        bpy.utils.unregister_class(cls)
+    auto_load.unregister()
 
     del bpy.types.Scene.wwmi_tools_settings
 
-
-if __name__ == '__main__':
-    register()
-
+    if bpy.app.timers.is_registered(trigger_mod_export):
+        bpy.app.timers.unregister(trigger_mod_export)
