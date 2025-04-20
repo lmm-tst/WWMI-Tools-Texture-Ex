@@ -6,7 +6,7 @@ Intended to work with 3dm buffers outside of Blender API
 
 import numpy as np
 
-from ..buffers.byte_buffer import ByteBuffer, IndexBuffer, AbstractSemantic, Semantic
+from ..data_model.byte_buffer import ByteBuffer, IndexBuffer, AbstractSemantic, Semantic
 
 
 class MeshObject:
