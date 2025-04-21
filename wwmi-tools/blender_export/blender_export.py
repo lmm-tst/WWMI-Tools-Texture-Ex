@@ -157,24 +157,20 @@ class ModExporter:
                 f.write(buffer.get_bytes())
 
         if not self.cfg.partial_export:
-                
+            # Write textures
             if self.cfg.copy_textures:
-                missing_textures = []
                 for texture in self.textures:
                     texture_path = self.textures_path / texture.filename
                     if texture_path.is_file():
                         continue
-                    missing_textures.append[texture_path]
-                if len(missing_textures) > 0:
-                    for texture_path in missing_textures:
-                        print(f'Copying {texture_path.name}...')
-                        shutil.copy(texture.path, texture_path)
-
+                    print(f'Copying {texture_path.name}...')
+                    shutil.copy(texture.path, texture_path)
+            # Write mod logo
             mod_logo_path = resolve_path(self.cfg.mod_logo)
             if mod_logo_path.is_file():
                 print(f'Copying {self.local_mod_logo_path.name}...')
                 shutil.copy(mod_logo_path, self.local_mod_logo_path)
-
+            # Write mod.ini
             if self.cfg.write_ini:
                 self.ini.write(ini_path=self.mod_output_folder / 'mod.ini')
                 # self.ini.write(ini_path=self.mod_output_folder / 'mod_old.ini', ini_string=self.ini.build_old())
