@@ -3,7 +3,7 @@ from . import auto_load
 
 bl_info = {
     "name": "WWMI Tools",
-    "version": (1, 0, 1),
+    "version": (1, 0, 2),
     "wwmi_version": (0, 7, 0),
     "blender": (2, 80, 0),
     "author": "SpectrumQT, LeoTorreZ, SinsOfSeven, SilentNightSound, DarkStarSword",
