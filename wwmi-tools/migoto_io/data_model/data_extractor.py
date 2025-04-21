@@ -129,7 +129,7 @@ class BlenderDataExtractor:
         
         if size == 0:
             size = len(data_source)
-        result = numpy.zeros(size, dtype=data_type)
+        result = numpy.empty(size, dtype=data_type)
         data_source.foreach_get(data_name, result.ravel())
         return result
 
