@@ -51,6 +51,8 @@ class DataModel:
                 if buffer is None:
                     buffer = NumpyBuffer(buffer_layout, size=len(data))
                 buffer.import_semantic_data(data, semantic)
+            if buffer is None:
+                continue
             result[buffer_name] = buffer
 
         print(f"Buffers build time: %fs ({len(result)} buffers)" % (time.time() - start_time))

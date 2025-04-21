@@ -85,6 +85,10 @@ class DataModelWWMI(DataModel):
         
         start_time = time.time()
 
+        if obj.data.shape_keys is None or len(obj.data.shape_keys) == 0:
+            print(f'No shapekeys found to process!')
+            return {}
+
         buffers = {}
         for buffer_name, buffer_layout in self.buffers_format.items():
             if buffer_name in excluded_buffers:
@@ -102,7 +106,7 @@ class DataModelWWMI(DataModel):
 
         shapekey_pattern = re.compile(r'.*(?:deform|custom)[_ -]*(\d+).*')
         shapekey_ids = {}
-
+        
         for shapekey in obj.data.shape_keys.key_blocks:
             match = shapekey_pattern.findall(shapekey.name.lower())
             if len(match) == 0:
