@@ -85,7 +85,7 @@ class DataModelWWMI(DataModel):
         
         start_time = time.time()
 
-        if obj.data.shape_keys is None or len(obj.data.shape_keys) == 0:
+        if obj.data.shape_keys is None or len(getattr(obj.data.shape_keys, 'key_blocks', [])) == 0:
             print(f'No shapekeys found to process!')
             return {}
 
