@@ -32,10 +32,13 @@ class DataModelWWMI(DataModel):
             BufferSemantic(AbstractSemantic(Semantic.Color, 0), DXGIFormat.R8G8B8A8_UNORM),
         ]),
         'TexCoord': BufferLayout([
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 0), DXGIFormat.R16G16_FLOAT),
+            # By default, data extractor tries to fetch blender data in output format to avoid unneeded conversions
+            # But we need to fetch TexCoords in full float32 range to run semantic converters without precision loss
+            # So we need to use extract_format override to tell data extractor to disable optimization mentioned above
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 0), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
             BufferSemantic(AbstractSemantic(Semantic.Color, 1), DXGIFormat.R16G16_UNORM),
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 1), DXGIFormat.R16G16_FLOAT),
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 2), DXGIFormat.R16G16_FLOAT),
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 1), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 2), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
         ]),
         'ShapeKeyOffset': BufferLayout([
             BufferSemantic(AbstractSemantic(Semantic.ShapeKey, 0), DXGIFormat.R32G32B32A32_UINT),
