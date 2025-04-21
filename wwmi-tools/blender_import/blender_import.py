@@ -23,6 +23,10 @@ from .buffers import VertexBuffer, IndexBuffer
 class Fatal(Exception): pass
 
 
+# TODO: Reimplement import in a way similar to export data_extractor and data_model:
+# 1. Add method to NumpyBuffer that would import raw numpy array based on given layout
+# 2. Convert as many operations to numpy operations and foreach_set as possible
+
 vertex_color_layer_channels = 4
 
 
@@ -123,10 +127,11 @@ def import_normals_step1(mesh, data, vertex_layers, translate_normal, flip_mesh)
 
 def import_normals_step2(mesh, flip_mesh):
     # Taken from import_obj/import_fbx
-    clnors = numpy.zeros(len(mesh.loops)*3, dtype=numpy.float32)
+    clnors = numpy.empty(len(mesh.loops)*3, dtype=numpy.float32)
     mesh.loops.foreach_get("normal", clnors)
     clnors = clnors.reshape((-1, 3))
-    clnors[:, 0] *= -(2 * flip_mesh - 1)
+    if flip_mesh:
+        clnors[:, 0] *= -1
     # Not sure this is still required with use_auto_smooth, but the other
     # importers do it, and at the very least it shouldn't hurt...
     mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
@@ -164,32 +169,37 @@ def import_vertex_groups(mesh, obj, blend_indices, blend_weights, component):
 
 
 def import_shapekeys(mesh, obj, shapekeys, flip_mesh = False):
-    if len(shapekeys.keys()) == 0:
+    if not shapekeys:
         return
-    
+
     # Add basis shapekey
-    basis_shapekey = obj.shape_key_add(name='Basis')
-    basis_shapekey.interpolation = 'KEY_LINEAR'
+    basis = obj.shape_key_add(name='Basis')
+    basis.interpolation = 'KEY_LINEAR'
 
     # Set shapekeys to relative 'cause WuWa uses this type
     obj.data.shape_keys.use_relative = True
 
     # Import shapekeys
-    for shapekey_id in shapekeys.keys():
+    vert_count = len(obj.data.vertices)
+
+    basis_co = numpy.empty(vert_count * 3, dtype=numpy.float32)
+    basis.data.foreach_get('co', basis_co)
+    basis_co = basis_co.reshape(-1, 3)  
+
+    for shapekey_id, offsets in shapekeys.items():
         # Add new shapekey
         shapekey = obj.shape_key_add(name=f'Deform {shapekey_id}')
         shapekey.interpolation = 'KEY_LINEAR'
 
-        # Apply shapekey vertex position offsets to each indexed vertex
-        shapekey_data = shapekeys[shapekey_id]
-        for vertex_id in range(len(obj.data.vertices)):
-            position_offset = shapekey_data[vertex_id]
-            if flip_mesh:
-                shapekey.data[vertex_id].co.x += -position_offset[0]
-            else:
-                shapekey.data[vertex_id].co.x += position_offset[0]
-            shapekey.data[vertex_id].co.y += position_offset[1]
-            shapekey.data[vertex_id].co.z += position_offset[2]
+        position_offsets = numpy.array(offsets, dtype=numpy.float32).reshape(-1, 3)
+
+        if flip_mesh:
+            position_offsets[:, 0] *= -1
+
+        # Apply shapekey vertex position offsets
+        position_offsets += basis_co
+
+        shapekey.data.foreach_set('co', position_offsets.ravel())
 
 
 def import_uv_layers(mesh, obj, texcoords, flip_texcoord_v):
@@ -466,10 +476,6 @@ def import_3dmigoto_vb_ib(operator, context, cfg, paths, flip_texcoord_v=True, f
     if flip_mesh:
         flip_winding = not flip_winding
 
-    # flip_mesh = True
-    flip_normal = False
-    # flip_winding = False
-
     if ib is not None:
         import_faces_from_ib(mesh, ib, flip_winding)
         # Attach the index buffer layout to the object for later exporting.
@@ -525,7 +531,7 @@ def blender_import(operator, context, cfg):
         ib_path = fmt_path.with_suffix('.ib')
         vb_path = fmt_path.with_suffix('.vb')
 
-        obj = import_3dmigoto_vb_ib(operator, context, cfg, [((vb_path, fmt_path), (ib_path, fmt_path), True, None)], flip_mesh=cfg.mirror_mesh, flip_winding=True, flip_normal=True)
+        obj = import_3dmigoto_vb_ib(operator, context, cfg, [((vb_path, fmt_path), (ib_path, fmt_path), True, None)], flip_mesh=cfg.mirror_mesh, flip_winding=True, flip_normal=False)
 
         link_object_to_collection(obj, col)
     
