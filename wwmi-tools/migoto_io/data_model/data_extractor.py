@@ -97,7 +97,11 @@ class BlenderDataExtractor:
 
             proxy_semantic = copy.deepcopy(export_semantic)
 
-            if export_format.dxgi_type in [DXGIType.UNORM16, DXGIType.UNORM8, DXGIType.SNORM16, DXGIType.SNORM8]:
+            if export_semantic.extract_format is not None:
+                # Export format has specified extraction format, lets hope they know what they're doing
+                proxy_semantic.format = export_semantic.extract_format
+                proxy_semantic.stride = export_semantic.extract_format.byte_width
+            elif export_format.dxgi_type in [DXGIType.UNORM16, DXGIType.UNORM8, DXGIType.SNORM16, DXGIType.SNORM8]:
                 # Formats UNORM16, UNORM8, SNORM16 and SNORM8 cannot be directly exported and require conversion
                 proxy_semantic.format = blender_format
                 proxy_semantic.stride = blender_format.byte_width

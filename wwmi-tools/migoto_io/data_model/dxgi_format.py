@@ -69,6 +69,10 @@ class DXGIFormat(Enum):
 
         if type_encoder is not None:
             obj.encoder = lambda data: type_encoder(obj.encoder(data))
+        else:
+            # Special encoder is not defined, lets use basic type conversion
+            # We shouldn't do it earlier, as list encoder already does it via fromiter
+            obj.type_encoder = lambda data: data.astype(obj.numpy_base_type)
 
         if type_decoder is not None:
             obj.decoder = lambda data: type_decoder(obj.decoder(data))

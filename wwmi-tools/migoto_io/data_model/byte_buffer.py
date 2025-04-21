@@ -67,6 +67,7 @@ class BufferSemantic:
     offset: int = 0
     converter: callable = None
     name: Optional[str] = None
+    extract_format: Optional[DXGIFormat] = None
 
     def __post_init__(self):
         # Calculate byte stride
