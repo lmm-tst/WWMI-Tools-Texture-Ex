@@ -144,7 +144,7 @@ class IniMaker:
         if chached_template_string is not None and template_string == chached_template_string:
             template = chached_template
         else:
-            start = time.time()
+            start_time = time.time()
             try:
                 template = Template(template_string)
                 chached_template = template
@@ -159,7 +159,7 @@ class IniMaker:
                                  f'Line Number: {e.lineno} (actual cause may be located above this line)\n\n'
                                  f'Template Fragment:\n'
                                  f'{template_fragment}')
-            print('Ini template caching time:', time.time() - start)
+            print(f'Ini template caching time: {time.time() - start_time :.3f}s')
 
         try:
             rendered_string = template.render(vars(self))

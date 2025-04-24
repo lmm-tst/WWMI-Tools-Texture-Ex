@@ -203,7 +203,7 @@ class BlenderDataExtractor:
         if dedupe:
             loop_data.remove_duplicates()
 
-        print(f'Loop data fetch time: %fs ({len(loop_data.get_data())} vertices, {len(index_data)} indices)' % (time.time() - start_time))
+        print(f'Loop data fetch time: {time.time() - start_time :.3f}s ({len(loop_data.get_data())} vertices, {len(index_data)} indices)')
 
         return loop_data, index_data
 
@@ -260,7 +260,7 @@ class BlenderDataExtractor:
 
             vertex_data.set_field(buffer_semantic.get_name(), data)
 
-        print(f'Vertex data fetch time: %fs ({len(vertex_data.get_data())} vertices)' % (time.time() - start_time))
+        print(f'Vertex data fetch time: {time.time() - start_time :.3f}s ({len(vertex_data.get_data())} vertices)')
 
         return vertex_data
 
@@ -293,7 +293,7 @@ class BlenderDataExtractor:
 
             result[shapekey.name] = data
 
-        print(f'Shape Keys fetch time: %fs ({len(result)} shapekeys)' % (time.time() - start_time))
+        print(f'Shape Keys fetch time: {time.time() - start_time :.3f}s ({len(result)} shapekeys)')
 
         return result
 

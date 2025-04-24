@@ -156,6 +156,6 @@ class DataModelWWMI(DataModel):
         buffers['ShapeKeyVertexId'].set_data(shapekey_vertex_ids)
         buffers['ShapeKeyVertexOffset'].set_data(shapekey_vertex_offsets_np)
 
-        print(f"Shape Keys formatting time: %fs ({len(shapekey_vertex_ids)} shapekeyed vertices)" % (time.time() - start_time))
+        print(f'Shape Keys formatting time: {time.time() - start_time :.3f}s ({len(shapekey_vertex_ids)} shapekeyed vertices)')
 
         return buffers

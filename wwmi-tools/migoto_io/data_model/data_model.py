@@ -85,7 +85,6 @@ class DataModel:
 
         data_importer.set_data(obj, mesh, index_buffer, vertex_buffer, semantic_converters, format_converters)
 
-
     def get_data(self, 
                  context: bpy.types.Context, 
                  collection: bpy.types.Collection, 
@@ -120,7 +119,7 @@ class DataModel:
                 continue
             result[buffer_name] = buffer
 
-        print(f"Buffers build time: %fs ({len(result)} buffers)" % (time.time() - start_time))
+        print(f'Buffers build time: {time.time() - start_time :.3f}s ({len(result)} buffers)')
 
         return result
 

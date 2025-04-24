@@ -96,7 +96,7 @@ class ModExporter:
                     raise ConfigError(self.cfg, 'use_custom_template', f'Failed to build mod.ini from custom template:\n{e}')
 
         if self.cfg.custom_template_live_update:
-            print(f"Total live ini template initialization time: %fs" % (time.time() - start_time))
+            print(f'Total live ini template initialization time: {time.time() - start_time :.3f}s')
             return
 
         try:
@@ -104,7 +104,7 @@ class ModExporter:
         except Exception as e:
             raise ConfigError(self.cfg, 'mod_output_folder', f'Failed to write files to mod folder:\n{e}')
 
-        print(f"Total mod export time: %fs" % (time.time() - start_time))
+        print(f'Total mod export time: {time.time() - start_time :.3f}s')
 
     def verify_config(self):
         if self.cfg.component_collection is None:
@@ -124,7 +124,7 @@ class ModExporter:
             skeleton_type=SkeletonType.Merged if self.cfg.mod_skeleton_type == 'MERGED' else SkeletonType.PerComponent,
         )
         self.merged_object = object_merger.merged_object
-        print(f"Merged object build time: %fs ({self.merged_object.vertex_count} vertices, {self.merged_object.index_count} indices)" % (time.time() - start_time))
+        print(f'Merged object build time: {time.time() - start_time :.3f}s ({self.merged_object.vertex_count} vertices, {self.merged_object.index_count} indices)')
 
     def build_data_buffers(self):
         start_time = time.time()
@@ -143,7 +143,7 @@ class ModExporter:
         self.merged_object.vertex_count = vertex_count
         self.merged_object.shapekeys.vertex_count = len(self.buffers.get('ShapeKeyVertexId', []))
 
-        print(f"Total mesh data collection time: %fs" % (time.time() - start_time))
+        print(f'Total mesh data collection time: {time.time() - start_time :.3f}s')
 
     def build_mod_ini(self):
         start_time = time.time()
@@ -175,7 +175,7 @@ class ModExporter:
         else:
             self.ini.build_from_template(self.context, self.cfg, with_checksum=True)
 
-        print(f"Total mod ini build time: %fs" % (time.time() - start_time))
+        print(f'Total mod ini build time: {time.time() - start_time :.3f}s')
 
     def write_files(self):
         start_time = time.time()
@@ -204,7 +204,7 @@ class ModExporter:
                 self.ini.write(ini_path=self.mod_output_folder / 'mod.ini')
                 # self.ini.write(ini_path=self.mod_output_folder / 'mod_old.ini', ini_string=self.ini.build_old())
                 
-        print(f"Disk write time: %fs" % (time.time() - start_time))
+        print(f'Disk write time: {time.time() - start_time :.3f}s')
 
     def compare_outputs(self, old_path: Path, new_path: Path):
 
