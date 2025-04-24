@@ -9,6 +9,8 @@ from typing import Dict
 from dataclasses import dataclass
 from collections import OrderedDict
 
+from ..addon.exceptions import ConfigError
+
 from ..migoto_io.blender_interface.utility import *
 
 from ..migoto_io.data_model.dxgi_format import DXGIFormat
@@ -251,10 +253,17 @@ def write_objects(output_directory, objects):
 def extract_frame_data(cfg):
 
     start_time = time.time()
+
+    dump_path = resolve_path(cfg.frame_dump_folder)
+
+    if not dump_path.is_dir():
+        raise ConfigError(cfg, 'frame_dump_folder', 'Specified dump folder does not exist!')
+    if not Path(dump_path / 'log.txt').is_file():
+        raise ConfigError(cfg, 'frame_dump_folder', 'Specified dump folder is missing log.txt file!')
     
     # Create data model of the frame dump
     dump = Dump(
-        dump_directory=resolve_path(cfg.frame_dump_folder)
+        dump_directory=dump_path
     )
 
     # Get data view from dump data model

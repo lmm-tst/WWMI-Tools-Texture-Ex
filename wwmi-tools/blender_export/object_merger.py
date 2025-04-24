@@ -87,6 +87,8 @@ class ObjectMerger:
             )
 
     def import_objects_from_collection(self):
+
+        num_objects = 0
         
         component_pattern = re.compile(r'.*component[_ -]*(\d+).*')
 
@@ -109,6 +111,11 @@ class ObjectMerger:
                 name=obj.name,
                 object=temp_obj,
             ))
+
+            num_objects += 1
+
+        if num_objects == 0:
+            raise ValueError(f'No eligible `Component` objects found!')
 
     def prepare_temp_objects(self):
 

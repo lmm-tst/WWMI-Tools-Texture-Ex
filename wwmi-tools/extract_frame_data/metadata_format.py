@@ -44,7 +44,5 @@ class ExtractedObject:
 
 
 def read_metadata(metadata_path: Path) -> ExtractedObject:
-    if not metadata_path.is_file():
-        return None
     with open(metadata_path) as f:
         return ExtractedObject(**json.load(f))

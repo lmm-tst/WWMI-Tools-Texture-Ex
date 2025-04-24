@@ -4,11 +4,14 @@ import shutil
 from typing import List, Dict, Union
 from dataclasses import dataclass, field
 
+from ..addon.exceptions import ConfigError
+
 from ..migoto_io.blender_interface.utility import *
 from ..migoto_io.blender_interface.collections import *
 from ..migoto_io.blender_interface.objects import *
 from ..migoto_io.blender_interface.mesh import *
 from ..migoto_io.data_model.byte_buffer import NumpyBuffer
+from ..migoto_io.data_model.data_model import DataModel
 
 from ..extract_frame_data.metadata_format import read_metadata, ExtractedObject
 
@@ -17,17 +20,18 @@ from .metadata_collector import Version, ModInfo
 from .texture_collector import Texture, get_textures
 from .ini_maker import IniMaker
 
-from ..migoto_io.data_model.data_model import DataModel
 from .data_models.data_model_wwmi import DataModelWWMI
 
 class Fatal(Exception): pass
 
 
+# TODO: Add support of buffers_format override, including ability to add .fmt for extra buffers
 data_models: Dict[str, DataModel] = {
     'WWMI': DataModelWWMI(),
 }
 
 
+# TODO: Add support of export of unhandled semantics from vertex attributes
 class ModExporter:
     extracted_object: ExtractedObject
     merged_object: MergedObject
@@ -49,6 +53,9 @@ class ModExporter:
         self.local_mod_logo_path = self.textures_path / 'Logo.dds'
 
     def export_mod(self):
+    
+        self.verify_config()
+
         start_time = time.time()
         print(f"Mod export started for '{self.cfg.component_collection.name}' object")
 
@@ -56,11 +63,19 @@ class ModExporter:
             self.cfg.partial_export = False
             self.cfg.write_ini = True
 
-        self.extracted_object = read_metadata(self.object_source_folder / 'Metadata.json')
+        try:
+            self.extracted_object = read_metadata(self.object_source_folder / 'Metadata.json')
+        except FileNotFoundError:
+            raise ConfigError(self.cfg, 'object_source_folder', 'Specified folder is missing Metadata.json!')
+        except Exception as e:
+            raise ConfigError(self.cfg, 'object_source_folder', f'Failed to load Metadata.json:\n{e}')
 
         user_context = get_user_context(self.context)
 
-        self.build_merged_object()
+        try:
+            self.build_merged_object()
+        except Exception as e:
+            raise ConfigError(self.cfg, 'component_collection', f'Failed to create merged object from collection:\n{e}')
             
         self.build_data_buffers()
 
@@ -73,15 +88,29 @@ class ModExporter:
             self.textures = get_textures(self.object_source_folder)
 
             if self.cfg.write_ini:
-                self.build_mod_ini()
+                try:
+                    self.build_mod_ini()
+                except FileNotFoundError:
+                    raise ConfigError(self.cfg, 'custom_template_source', f'Specified custom template file not found!')
+                except Exception as e:
+                    raise ConfigError(self.cfg, 'use_custom_template', f'Failed to build mod.ini from custom template:\n{e}')
 
         if self.cfg.custom_template_live_update:
             print(f"Total live ini template initialization time: %fs" % (time.time() - start_time))
             return
 
-        self.write_files()
+        try:
+            self.write_files()
+        except Exception as e:
+            raise ConfigError(self.cfg, 'mod_output_folder', f'Failed to write files to mod folder:\n{e}')
 
         print(f"Total mod export time: %fs" % (time.time() - start_time))
+
+    def verify_config(self):
+        if self.cfg.component_collection is None:
+            raise ConfigError(self.cfg, 'component_collection', f'Components collection is not specified!')
+        if self.cfg.component_collection not in list(get_scene_collections()):
+            raise ConfigError(self.cfg, 'component_collection', f'Collection "{self.cfg.component_collection.name}" is not a member of "Scene Collection"!')
 
     def build_merged_object(self):
         start_time = time.time()
@@ -177,6 +206,52 @@ class ModExporter:
                 
         print(f"Disk write time: %fs" % (time.time() - start_time))
 
+    def compare_outputs(self, old_path: Path, new_path: Path):
+
+        global data_models
+        data_model = data_models['WWMI']
+
+        for buffer_name, layout in data_model.buffers_format.items():
+
+            print(f'Comparing {buffer_name}.buf buffers...')
+
+            with open(old_path / (buffer_name + '.buf'), 'rb') as f1, open(new_path / (buffer_name + '.buf'), 'rb') as f2:
+                
+                old_buffer = NumpyBuffer(layout)
+                old_buffer.import_raw_data(f1.read())
+
+                new_buffer = NumpyBuffer(layout)
+                new_buffer.import_raw_data(f2.read())
+
+                for semantic in layout.semantics:
+
+                    old_semantic_data = old_buffer.get_field(semantic.get_name()).tolist()
+                    new_semantic_data = new_buffer.get_field(semantic.get_name()).tolist()
+
+                    if old_semantic_data == new_semantic_data:
+                        print(f'{buffer_name} {semantic.abstract} matches!')
+                    else:
+                        # print(f'{buffer_name} {semantic.abstract} differs:')
+
+                        verbose = True
+                        if buffer_name == 'Vector':
+                            print(f'Comparing {semantic.abstract} in silent mode...')
+                            verbose = False
+                        else:
+                            print(f'Comparing {semantic.abstract} in verbose mode...')
+
+                        num_diffs = 0
+
+                        for i in range(len(old_semantic_data)):
+                            old_data = old_semantic_data[i]
+                            new_data = new_semantic_data[i]
+
+                            if old_data != new_data:
+                                num_diffs += 1
+                                if verbose:
+                                    print(f'Element {i} diff: {old_data} != {new_data}')
+
+                        print(f'Found {num_diffs} diffs (out of {len(old_semantic_data)} entries)')
 
 def blender_export(operator, context, cfg, excluded_buffers):
     mod_exporter = ModExporter(context, cfg, excluded_buffers)
