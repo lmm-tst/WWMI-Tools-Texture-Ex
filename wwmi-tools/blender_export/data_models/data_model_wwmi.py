@@ -54,15 +54,16 @@ class DataModelWWMI(DataModel):
     def __init__(self):
         self.flip_winding = True
         self.flip_bitangent_sign = True
+        self.flip_texcoord_v = True
         self.semantic_converters = {
-            AbstractSemantic(Semantic.TexCoord, 0): [self.convert_texcoord_semantic],
-            AbstractSemantic(Semantic.TexCoord, 1): [self.convert_texcoord_semantic],
-            AbstractSemantic(Semantic.TexCoord, 2): [self.convert_texcoord_semantic],
+            # Reshape flat array [[0,0,0],[0,0,0]] to [[0,0,0,1],[0,0,0,1]]
+            AbstractSemantic(Semantic.Tangent, 0): [lambda data: self.converter_resize_second_dim(data, 4, fill=1)],
         }
         self.format_converters = {
-            AbstractSemantic(Semantic.Index): [self.convert_indices_format],
-            AbstractSemantic(Semantic.Tangent, 0): [self.convert_tangent_format],
-            AbstractSemantic(Semantic.Color, 1): [self.convert_color1_format],
+            # Reshape flat array [0,1,2,3,4,5] to [[0,1,2],[3,4,5]]
+            AbstractSemantic(Semantic.Index): [lambda data: self.converter_reshape_second_dim(data, 3)],
+            # Trim color array [[1,1,0,0],[1,1,0,0]] to [[1,1],[1,1]]
+            AbstractSemantic(Semantic.Color, 1): [lambda data: self.converter_resize_second_dim(data, 2)],
         }
 
     def get_data(self, 
@@ -158,26 +159,3 @@ class DataModelWWMI(DataModel):
         print(f"Shape Keys formatting time: %fs ({len(shapekey_vertex_ids)} shapekeyed vertices)" % (time.time() - start_time))
 
         return buffers
-
-    @staticmethod
-    def convert_texcoord_semantic(data: numpy.ndarray) -> numpy.ndarray:
-        data[:, 1] = 1.0 - data[:, 1]
-        return data
-
-    @staticmethod
-    def convert_indices_format(index_buffer: numpy.ndarray) -> numpy.ndarray:
-        # Reshape flat array [0,1,2,3,4,5] to [[0,1,2],[3,4,5]]
-        index_buffer = numpy.reshape(index_buffer, (-1, 3))
-        return index_buffer
-
-    @staticmethod
-    def convert_tangent_format(data: numpy.ndarray) -> numpy.ndarray:
-        result = numpy.zeros(len(data), dtype=(numpy.int8, 4))
-        result[:, 0:3] = data
-        # Write `7F` (aka decimal 127 aka `1` in R8_SNORM)
-        result[:, 3] = 127
-        return result
-
-    @staticmethod
-    def convert_color1_format(data: numpy.ndarray) -> numpy.ndarray:
-        return data[:, :2]
