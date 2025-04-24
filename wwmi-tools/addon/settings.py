@@ -6,9 +6,13 @@ from .. import bl_info
 from .. import __name__ as package_name
 from .. import addon_updater_ops
 
+from .exceptions import clear_error
 
 class WWMI_Settings(bpy.types.PropertyGroup):
-    # project_builder = ProjectBuilder()
+
+    def on_update_clear_error(self, property_name):
+        if self.last_error_setting_name == property_name:
+            clear_error(self)
 
     wwmi_tools_version: bpy.props.StringProperty(
         name = "WWMI Tools Version",
@@ -39,6 +43,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
             ('EXTRACT_FRAME_DATA', 'Extract Objects From Dump', 'Extract components of all WWMI-compatible objects from the selected frame dump directory'),
             ('TOOLS_MODE', 'Toolbox', 'Bunch of useful object actions'),
         ],
+        update=lambda self, context: clear_error(self),
         default=0,
     ) # type: ignore
 
@@ -51,6 +56,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         description="Frame dump files directory",
         default='',
         subtype="DIR_PATH",
+        update=lambda self, context: self.on_update_clear_error('frame_dump_folder'),
     ) # type: ignore
 
     skip_small_textures: BoolProperty(
@@ -93,6 +99,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         description="Directory with components and textures of WWMI object",
         default='',
         subtype="DIR_PATH",
+        update=lambda self, context: self.on_update_clear_error('object_source_folder'),
     ) # type: ignore
 
     import_skeleton_type: bpy.props.EnumProperty(
@@ -114,11 +121,12 @@ class WWMI_Settings(bpy.types.PropertyGroup):
     ########################################
     # Mod Export
     ########################################
-
+        
     component_collection: PointerProperty(
         name="Components",
         description="Collection with WWMI object's components named like `Component 0` or `Component_1 RedHat` or `Dat Gas cOmPoNENT- 3 OMG` (lookup RegEx: r'.*component[_ -]*(\d+).*')",
         type=bpy.types.Collection,
+        update=lambda self, context: self.on_update_clear_error('component_collection'),
         # default=False
     ) # type: ignore
 
@@ -127,6 +135,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         description="Mod export directory to place mod.ini and Meshes&Textures folders into",
         default='',
         subtype="DIR_PATH",
+        update=lambda self, context: self.on_update_clear_error('mod_output_folder'),
     ) # type: ignore
     
     apply_modifiers: BoolProperty(
@@ -288,6 +297,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         name="Use Custom Template",
         description="Use configured jinja2 template to build fully custom mod.ini.",
         default=False,
+        update=lambda self, context: self.on_update_clear_error('use_custom_template'),
     ) # type: ignore
 
     custom_template_live_update: BoolProperty(
@@ -304,6 +314,7 @@ class WWMI_Settings(bpy.types.PropertyGroup):
             ('EXTERNAL', 'External File', 'Use specified file as custom template.'),
         ],
         default=0,
+        update=lambda self, context: self.on_update_clear_error('use_custom_template'),
     ) # type: ignore
 
     custom_template_path: StringProperty(
@@ -311,6 +322,19 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         description="Path to mod.ini template file.\nTo create new file, copy template text from built-in editor to new text file.",
         default='',
         subtype="FILE_PATH",
+        update=lambda self, context: self.on_update_clear_error('custom_template_path'),
+    ) # type: ignore
+
+    last_error_setting_name: StringProperty(
+        name="Last Error Setting Name",
+        description="Name of setting property which was cause of last error.",
+        default='component_collection',
+    ) # type: ignore
+
+    last_error_text: StringProperty(
+        name="Last Error Text",
+        description="Text of last error.",
+        default='Collection must be filled!',
     ) # type: ignore
 
 

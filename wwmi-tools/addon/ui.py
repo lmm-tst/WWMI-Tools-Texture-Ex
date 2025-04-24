@@ -6,6 +6,8 @@ from bpy.props import BoolProperty, StringProperty, PointerProperty, IntProperty
 from .. import bl_info
 from .. import addon_updater_ops
 
+from .exceptions import clear_error, ConfigError
+
 from ..migoto_io.blender_interface.objects import *
 from ..migoto_io.blender_interface.collections import *
 from ..migoto_io.blender_interface.utility import *
@@ -16,6 +18,29 @@ from ..blender_import.blender_import import blender_import
 from ..blender_export.blender_export import blender_export
 from ..blender_export.ini_maker import IniMaker
 from ..extract_frame_data.extract_frame_data import extract_frame_data
+
+
+def add_row_with_error_handler(layout, cfg, setting_names):
+    if not cfg.last_error_setting_name or cfg.last_error_setting_name not in setting_names:
+        return layout.row()
+    else:
+        layout.alert = True
+        row = layout.row()
+        error_lines = cfg.last_error_text.split('\n')
+        
+        if len(error_lines) == 1:
+            error_row = layout.row()
+            error_row.alignment = 'CENTER'
+            error_row.label(text=error_lines[0], icon='ERROR')
+        else:
+            error_box = layout.box()
+            error_box.label(text=error_lines[0], icon='ERROR')
+            for line in error_lines[1:]:
+                if not line.strip():
+                    continue
+                error_box.label(text=line, icon='BLANK1') 
+        layout.alert = False
+        return row
 
 
 class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
@@ -76,11 +101,17 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         
         layout.row()
         
-        layout.row().prop(cfg, 'component_collection')
-        layout.row().prop(cfg, 'object_source_folder')
-        layout.row().prop(cfg, 'mod_output_folder')
-        layout.row().prop(cfg, 'mod_skeleton_type')
+        row = add_row_with_error_handler(layout, cfg, 'component_collection')
+        row.prop(cfg, 'component_collection')
 
+        row = add_row_with_error_handler(layout, cfg, 'object_source_folder')
+        row.prop(cfg, 'object_source_folder')
+
+        row = add_row_with_error_handler(layout, cfg, 'mod_output_folder')
+        row.prop(cfg, 'mod_output_folder')
+        
+        layout.row().prop(cfg, 'mod_skeleton_type')
+                
         layout.row()
 
         layout.row().prop(cfg, 'mirror_mesh')
@@ -114,7 +145,9 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         
         layout.row()
 
-        layout.row().prop(cfg, 'object_source_folder')
+        row = add_row_with_error_handler(layout, cfg, 'object_source_folder')
+        row.prop(cfg, 'object_source_folder')
+
         layout.row().prop(cfg, 'import_skeleton_type')
         layout.row().prop(cfg, 'mirror_mesh')
 
@@ -128,7 +161,9 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         
         layout.row()
 
-        layout.row().prop(cfg, 'frame_dump_folder')
+        row = add_row_with_error_handler(layout, cfg, 'frame_dump_folder')
+        row.prop(cfg, 'frame_dump_folder')
+
         layout.row().prop(cfg, 'extract_output_folder')
 
         layout.row()
@@ -203,6 +238,7 @@ class WWMI_TOOLS_PT_SidePanelModInfo(bpy.types.Panel):
 
 class WWMI_TOOLS_PT_SidePanelIniTemplate(bpy.types.Panel):
     bl_label = "Ini Template"
+    bl_idname = "WWMI_TOOLS_PT_INI_TEMPLATE"
     bl_parent_id = "WWMI_TOOLS_PT_SIDEBAR"
     bl_options = {'DEFAULT_CLOSED'}
     bl_space_type = 'VIEW_3D'
@@ -219,7 +255,8 @@ class WWMI_TOOLS_PT_SidePanelIniTemplate(bpy.types.Panel):
         layout = self.layout
         cfg = context.scene.wwmi_tools_settings
     
-        row = layout.row()
+        row = add_row_with_error_handler(layout, cfg, ['use_custom_template', 'custom_template_source'])
+
         split = row.split(factor=0.5)
 
         col_left = split.column()
@@ -232,7 +269,8 @@ class WWMI_TOOLS_PT_SidePanelIniTemplate(bpy.types.Panel):
             layout.row().operator(WWMI_OpenIniTemplateEditor.bl_idname)
 
         elif cfg.custom_template_source == 'EXTERNAL':
-            layout.row().prop(cfg, 'custom_template_path')
+            row = add_row_with_error_handler(layout, cfg, 'custom_template_path')
+            row.prop(cfg, 'custom_template_path')
 
             row = layout.row()
             split = row.split(factor=0.5)
@@ -285,10 +323,14 @@ class WWMI_Import(bpy.types.Operator):
     def execute(self, context):
         try:
             cfg = context.scene.wwmi_tools_settings
+
+            clear_error(cfg)
+
             cfg.mod_skeleton_type = cfg.import_skeleton_type
+            
             blender_import(self, context, cfg)
 
-        except ValueError as e:
+        except ConfigError as e:
             self.report({'ERROR'}, str(e))
         
         return {'FINISHED'}
@@ -338,24 +380,18 @@ class WWMI_Export(bpy.types.Operator):
 
             return []
 
-    def verify_collection(self, context):
-        cfg = context.scene.wwmi_tools_settings
-        if not cfg.component_collection.name in get_scene_collections():
-            raise ValueError(f'Collection "{cfg.component_collection.name}" must be a member of "Scene Collection"!')
-
     def execute(self, context):
         try:
             cfg = context.scene.wwmi_tools_settings
 
-            self.verify_collection(context)
+            clear_error(cfg)
 
             excluded_buffers = self.get_excluded_buffers(context)
 
             blender_export(self, context, cfg, excluded_buffers)
             
-        except ValueError as e:
-            # self.report({'ERROR'}, str(e))
-            raise e
+        except ConfigError as e:
+            self.report({'ERROR'}, str(e))
             
         return {'FINISHED'}
 
@@ -372,9 +408,11 @@ class WWMI_ExtractFrameData(bpy.types.Operator):
         try:
             cfg = context.scene.wwmi_tools_settings
 
+            clear_error(cfg)
+
             extract_frame_data(cfg)
             
-        except ValueError as e:
+        except ConfigError as e:
             self.report({'ERROR'}, str(e))
             
         return {'FINISHED'}
