@@ -12,19 +12,7 @@ from .dxgi_format import DXGIFormat, DXGIType
 
 
 class BlenderDataExtractor:
-    blender_data_formats: Dict[Semantic, DXGIFormat] = {
-        Semantic.Index: DXGIFormat.R32_UINT,
-        Semantic.VertexId: DXGIFormat.R32_UINT,
-        Semantic.Normal: DXGIFormat.R16G16B16_FLOAT,
-        Semantic.Tangent: DXGIFormat.R16G16B16_FLOAT,
-        Semantic.BitangentSign: DXGIFormat.R16_FLOAT,
-        Semantic.Color: DXGIFormat.R32G32B32A32_FLOAT,
-        Semantic.TexCoord: DXGIFormat.R32G32_FLOAT,
-        Semantic.Position: DXGIFormat.R32G32B32_FLOAT,
-        Semantic.Blendindices: DXGIFormat.R32_UINT,
-        Semantic.Blendweight: DXGIFormat.R32_FLOAT,
-        Semantic.ShapeKey: DXGIFormat.R32G32B32_FLOAT,
-    }
+    blender_data_formats: Dict[Semantic, DXGIFormat]
     blender_loop_semantics: List[Semantic] = [
         Semantic.Index, Semantic.VertexId, Semantic.Normal, Semantic.Tangent, Semantic.BitangentSign, Semantic.Color, Semantic.TexCoord
     ]
@@ -37,10 +25,13 @@ class BlenderDataExtractor:
     def get_data(self, 
                  mesh: bpy.types.Mesh, 
                  layout: BufferLayout, 
+                 blender_data_formats: Dict[Semantic, DXGIFormat],
                  semantic_converters: Dict[AbstractSemantic, List[callable]], 
                  format_converters: Dict[AbstractSemantic, List[callable]],
                  vertex_ids_cache: Optional[numpy.ndarray] = None,
                  flip_winding= False) -> Tuple[numpy.ndarray, NumpyBuffer]:
+        
+        self.blender_data_formats = blender_data_formats
         
         layout.add_element(BufferSemantic(AbstractSemantic(Semantic.VertexId, 0), self.blender_data_formats[Semantic.VertexId]))
         proxy_layout = self.make_proxy_layout(layout)
