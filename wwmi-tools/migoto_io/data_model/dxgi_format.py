@@ -92,13 +92,16 @@ class DXGIFormat(Enum):
 
     def get_format(self):
         return 'DXGI_FORMAT_' + self.format
-
-    def get_numpy_type(self, data_stride = 0):
+    
+    def get_num_values(self, data_stride = 0):
         if data_stride > 0:
             # Caller specified data_stride, number of values may differ from the base dtype
-            num_values = int(data_stride / self.value_byte_width)
+            return int(data_stride / self.value_byte_width)
         else:
-            num_values = self.num_values
+            return self.num_values
+
+    def get_numpy_type(self, data_stride = 0):
+        num_values = self.get_num_values(data_stride)
         # Tuple format of (type, 1) is deprecated, so we have to take special care
         if num_values == 1:
             return self.numpy_base_type

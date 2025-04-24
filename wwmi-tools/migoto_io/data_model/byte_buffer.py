@@ -65,7 +65,6 @@ class BufferSemantic:
     format: DXGIFormat
     stride: int = 0
     offset: int = 0
-    converter: callable = None
     name: Optional[str] = None
     extract_format: Optional[DXGIFormat] = None
 
@@ -96,6 +95,9 @@ class BufferSemantic:
 
     def get_name(self):
         return self.name if self.name else self.abstract.get_name()
+
+    def get_num_values(self):
+        return self.format.get_num_values(self.stride)
 
     def get_numpy_type(self):
         return self.format.get_numpy_type(self.stride)
@@ -153,6 +155,12 @@ class BufferLayout:
             ret += semantic.to_string()
         return ret
 
+    def get_numpy_type(self):
+        dtype = numpy.dtype([])
+        for semantic in self.semantics:
+            dtype = numpy.dtype(dtype.descr + [(semantic.abstract.get_name(), (semantic.get_numpy_type()))])
+        return dtype
+    
 
 class NumpyBuffer:
     layout: BufferLayout
@@ -169,7 +177,7 @@ class NumpyBuffer:
         if data is not None:
             self.data = data
         elif size > 0:
-            self.data = numpy.zeros(size, dtype=self.make_layout_numpy_type())
+            self.data = numpy.zeros(size, dtype=self.layout.get_numpy_type())
 
     def set_field(self, field: str, data: Optional[numpy.ndarray]):
         self.data[field] = data
@@ -183,13 +191,6 @@ class NumpyBuffer:
     def get_field(self, field: str) -> numpy.ndarray:
         return self.data[field]
 
-    def make_layout_numpy_type(self, layout = None):
-        layout =  self.layout if layout is None else layout
-        dtype = numpy.dtype([])
-        for semantic in layout.semantics:
-            dtype = numpy.dtype(dtype.descr + [(semantic.abstract.get_name(), (semantic.get_numpy_type()))])
-        return dtype
-
     def remove_duplicates(self, keep_order = True):
         if keep_order:
             _, unique_index = numpy.unique(self.data, return_index=True)
@@ -202,6 +203,7 @@ class NumpyBuffer:
                              semantic: Union[BufferSemantic, int], 
                              semantic_converters: Optional[List[callable]] = None,
                              format_converters: Optional[List[callable]] = None):
+        
         if isinstance(semantic, int):
             semantic = self.layout.semantics[semantic]
         current_semantic = self.layout.get_element(semantic.abstract)
@@ -235,6 +237,9 @@ class NumpyBuffer:
                 data_semantic,
                 semantic_converters.get(buffer_semantic.abstract, []),
                 format_converters.get(buffer_semantic.abstract, []))
+            
+    def import_raw_data(self, data: numpy.ndarray):
+        self.data = numpy.frombuffer(data, dtype=self.layout.get_numpy_type())
 
     def get_bytes(self):
         return self.data.tobytes()
