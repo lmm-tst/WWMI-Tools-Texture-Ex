@@ -234,7 +234,7 @@ if $mod_enabled
     {%- endfor %}
         {{note("Restore required parts of original context")}}
         run = CommandListCleanupSharedResources
-    {%- else -%}
+    {%- else %}
         {{note("Skip original draw call")}}
         handling = skip
         {{note("Trigger by-hash resource overrides")}}
