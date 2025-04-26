@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent / 'libs'))
 
 bl_info = {
     "name": "WWMI Tools",
-    "version": (1, 1, 0),
+    "version": (1, 1, 1),
     "wwmi_version": (0, 7, 7),
     "blender": (2, 93, 0),
     "author": "SpectrumQT, LeoTorreZ, SinsOfSeven, SilentNightSound, DarkStarSword",
