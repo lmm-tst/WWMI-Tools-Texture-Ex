@@ -53,7 +53,7 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "WWMI Tools"
-    bl_context = "objectmode"
+    # bl_context = "objectmode"
 
     # @classmethod
     # def poll(cls, context):
@@ -669,7 +669,7 @@ class UpdaterPanel(bpy.types.Panel):
     bl_idname = "WWMI_TOOLS_PT_UpdaterPanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_context = "objectmode"
+    # bl_context = "objectmode"
     bl_category = "WWMI Tools"
     bl_order = 99
     bl_options = {'DEFAULT_CLOSED'}
@@ -700,7 +700,7 @@ class DebugPanel(bpy.types.Panel):
     bl_idname = "WWMI_TOOLS_PT_DebugPanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_context = "objectmode"
+    # bl_context = "objectmode"
     bl_category = "WWMI Tools"
     bl_order = 80
     bl_options = {'DEFAULT_CLOSED'}
