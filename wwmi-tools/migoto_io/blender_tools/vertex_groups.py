@@ -1,3 +1,6 @@
+import bpy
+import itertools
+
 from ..blender_interface.objects import *
 
 
@@ -49,4 +52,47 @@ def fill_gaps_in_vertex_groups(context, obj):
         for number in missing:
             obj.vertex_groups.new(name=f"{number}")
 
+        bpy.ops.object.vertex_group_sort()
+
+
+def merge_vertex_groups(context, obj):
+    # Author: SilentNightSound#7430
+
+    # Combines vertex groups with the same prefix into one, a fast alternative to the Vertex Weight Mix that works for multiple groups
+    # You will likely want to use blender_fill_vg_gaps.txt after this to fill in any gaps caused by merging groups together
+    # Runs the merge on ALL vertex groups in the selected object(s)
+
+    with OpenObject(context, obj) as obj:
+
+        vg_names = [vg.name.split(".")[0] for vg in obj.vertex_groups]
+
+        if not vg_names:
+            raise ValueError('No vertex groups found, make sure that selected object has vertex groups!')
+
+        for vg_name in vg_names:
+
+            relevant = [x.name for x in obj.vertex_groups if x.name.split(".")[0] == f"{vg_name}"]
+
+            if relevant:
+
+                vgroup = obj.vertex_groups.new(name=f"x{vg_name}")
+                    
+                for vert_id, vert in enumerate(obj.data.vertices):
+                    available_groups = [v_group_elem.group for v_group_elem in vert.groups]
+                    
+                    combined = 0
+                    for v in relevant:
+                        if obj.vertex_groups[v].index in available_groups:
+                            combined += obj.vertex_groups[v].weight(vert_id)
+
+                    if combined > 0:
+                        vgroup.add([vert_id], combined ,'ADD')
+                        
+                for vg in [x for x in obj.vertex_groups if x.name.split(".")[0] == f"{vg_name}"]:
+                    obj.vertex_groups.remove(vg)
+
+                for vg in obj.vertex_groups:
+                    if vg.name[0].lower() == "x":
+                        vg.name = vg.name[1:]
+                            
         bpy.ops.object.vertex_group_sort()

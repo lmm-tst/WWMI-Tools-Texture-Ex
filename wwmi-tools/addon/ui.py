@@ -91,6 +91,7 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         layout = self.layout
 
         layout.row().operator(WWMI_ApplyModifierForObjectWithShapeKeysOperator.bl_idname)
+        layout.row().operator(WWMI_MergeVertexGroups.bl_idname)
         layout.row().operator(WWMI_FillGapsInVertexGroups.bl_idname)
         layout.row().operator(WWMI_RemoveUnusedVertexGroups.bl_idname)
         layout.row().operator(WWMI_RemoveAllVertexGroups.bl_idname)
@@ -413,6 +414,22 @@ class WWMI_ExtractFrameData(bpy.types.Operator):
             extract_frame_data(cfg)
             
         except ConfigError as e:
+            self.report({'ERROR'}, str(e))
+            
+        return {'FINISHED'}
+    
+
+class WWMI_MergeVertexGroups(bpy.types.Operator):
+    bl_idname = "wwmi_tools.merge_vertex_groups"
+    bl_label = "Merge Vertex Groups"
+    bl_description = "Merges vertex groups with same name before dot (i.e. `7` with `7.1` and `7.3`). Sourced by SilentNightSound#7430"
+
+    def execute(self, context):
+        try:
+            for obj in get_selected_objects(context):
+                merge_vertex_groups(context, obj)
+            
+        except ValueError as e:
             self.report({'ERROR'}, str(e))
             
         return {'FINISHED'}
