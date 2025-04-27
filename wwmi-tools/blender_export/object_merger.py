@@ -32,6 +32,11 @@ class MergedObjectComponent:
     objects: List[TempObject]
     vertex_count: int = 0
     index_count: int = 0
+    
+    def get_object(self, object_name):
+        for obj in self.objects:
+            if obj.name == object_name:
+                return obj
 
 
 @dataclass
