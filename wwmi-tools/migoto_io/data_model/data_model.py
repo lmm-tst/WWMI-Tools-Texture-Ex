@@ -91,17 +91,28 @@ class DataModel:
                  obj: bpy.types.Object, 
                  mesh: bpy.types.Mesh, 
                  excluded_buffers: List[str], 
+                 buffers_format: Optional[Dict[Semantic, DXGIFormat]] = None,
                  mirror_mesh: bool = False) -> Tuple[Dict[str, NumpyBuffer], int]:
         
-        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, mirror_mesh)
-        buffers = self.build_buffers(index_data, vertex_buffer, excluded_buffers)
+        if buffers_format is None:
+            buffers_format = self.buffers_format
+
+        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, buffers_format, mirror_mesh)
+
+        buffers = self.build_buffers(index_data, vertex_buffer, excluded_buffers, buffers_format)
+
         return buffers, len(vertex_buffer)
 
-    def build_buffers(self, index_data, vertex_buffer, excluded_buffers) -> Dict[str, NumpyBuffer]:
+    def build_buffers(self,
+                      index_data: numpy.ndarray, 
+                      vertex_buffer: NumpyBuffer, 
+                      excluded_buffers: List[str],
+                      buffers_format: Dict[Semantic, DXGIFormat]) -> Dict[str, NumpyBuffer]:
+        
         start_time = time.time()
 
         result = {}
-        for buffer_name, buffer_layout in self.buffers_format.items():
+        for buffer_name, buffer_layout in buffers_format.items():
             buffer = None
             if buffer_name in excluded_buffers:
                 continue
@@ -123,18 +134,27 @@ class DataModel:
 
         return result
 
-    def export_data(self, context, collection, mesh, excluded_buffers, mirror_mesh: bool = False):
-        export_layout, fetch_loop_data = self.make_export_layout(excluded_buffers)
+    def export_data(self, 
+                    context: bpy.types.Context, 
+                    collection: bpy.types.Collection, 
+                    mesh: bpy.types.Mesh, 
+                    excluded_buffers: List[str], 
+                    buffers_format: Dict[Semantic, DXGIFormat],
+                    mirror_mesh: bool = False):
+        
+        export_layout, fetch_loop_data = self.make_export_layout(buffers_format, excluded_buffers)
         index_data, vertex_buffer = self.get_mesh_data(context, collection, mesh, export_layout, fetch_loop_data, mirror_mesh)
         return index_data, vertex_buffer
 
-    def make_export_layout(self, excluded_buffers):
+    def make_export_layout(self, 
+                           buffers_format: Dict[Semantic, DXGIFormat],
+                           excluded_buffers: List[str]):
         fetch_loop_data = False
 
         if len(excluded_buffers) == 0:
             fetch_loop_data = True
         else:
-            for buffer_name, buffer_layout in self.buffers_format.items():
+            for buffer_name, buffer_layout in buffers_format.items():
                 if buffer_name not in excluded_buffers:
                     for semantic in buffer_layout.semantics:
                         if semantic.abstract.enum in self.data_extractor.blender_loop_semantics:
@@ -142,7 +162,7 @@ class DataModel:
                             break
 
         export_layout = BufferLayout([])
-        for buffer_name, buffer_layout in self.buffers_format.items():
+        for buffer_name, buffer_layout in buffers_format.items():
             exclude_buffer = buffer_name in excluded_buffers
             for semantic in buffer_layout.semantics:
                 if exclude_buffer and semantic.abstract.enum not in self.data_extractor.blender_loop_semantics:

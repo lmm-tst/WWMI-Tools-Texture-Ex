@@ -32,13 +32,10 @@ class DataModelWWMI(DataModel):
             BufferSemantic(AbstractSemantic(Semantic.Color, 0), DXGIFormat.R8G8B8A8_UNORM),
         ]),
         'TexCoord': BufferLayout([
-            # By default, data extractor tries to fetch blender data in output format to avoid unneeded conversions
-            # But we need to fetch TexCoords in full float32 range to run semantic converters without precision loss
-            # So we need to use extract_format override to tell data extractor to disable optimization mentioned above
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 0), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 0), DXGIFormat.R16G16_FLOAT),
             BufferSemantic(AbstractSemantic(Semantic.Color, 1), DXGIFormat.R16G16_UNORM),
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 1), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
-            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 2), DXGIFormat.R16G16_FLOAT, extract_format=DXGIFormat.R32G32_FLOAT),
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 1), DXGIFormat.R16G16_FLOAT),
+            BufferSemantic(AbstractSemantic(Semantic.TexCoord, 2), DXGIFormat.R16G16_FLOAT),
         ]),
         'ShapeKeyOffset': BufferLayout([
             BufferSemantic(AbstractSemantic(Semantic.ShapeKey, 0), DXGIFormat.R32G32B32A32_UINT),
@@ -72,13 +69,21 @@ class DataModelWWMI(DataModel):
                  obj: bpy.types.Object, 
                  mesh: bpy.types.Mesh, 
                  excluded_buffers: List[str],
+                 buffers_format: Optional[Dict[Semantic, DXGIFormat]] = None,
                  mirror_mesh: bool = False) -> Tuple[Dict[str, NumpyBuffer], int]:
         
-        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, mirror_mesh)
-        buffers = self.build_buffers(index_data, vertex_buffer, excluded_buffers)
+        if buffers_format is None:
+            buffers_format = self.buffers_format
+
+        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, buffers_format, mirror_mesh)
+
+        buffers = self.build_buffers(index_data, vertex_buffer, excluded_buffers, buffers_format)
+
         vertex_ids = vertex_buffer.get_field(AbstractSemantic(Semantic.VertexId).get_name())
+
         shapekeys = self.export_shapekeys(obj, vertex_ids, excluded_buffers, mirror_mesh)
         buffers.update(shapekeys)
+
         return buffers, len(vertex_ids)
 
     def export_shapekeys(self, 
