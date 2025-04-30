@@ -27,7 +27,7 @@ class ObjectImporter:
         object_source_folder = resolve_path(cfg.object_source_folder)
 
         if not object_source_folder.is_dir():
-            raise ConfigError(cfg, 'object_source_folder', 'Specified sources folder does not exist!')
+            raise ConfigError('object_source_folder', 'Specified sources folder does not exist!')
 
         start_time = time.time()
         print(f"Object import started for '{object_source_folder.stem}' folder")
@@ -43,9 +43,9 @@ class ObjectImporter:
             vb_path = fmt_path.with_suffix('.vb')
 
             if not ib_path.is_file():
-                raise ConfigError(cfg, 'object_source_folder', f'Specified folder is missing .fmt file for {fmt_path.stem}!')
+                raise ConfigError('object_source_folder', f'Specified folder is missing .fmt file for {fmt_path.stem}!')
             if not vb_path.is_file():
-                raise ConfigError(cfg, 'object_source_folder', f'Specified folder is missing .fmt file for {fmt_path.stem}!')
+                raise ConfigError('object_source_folder', f'Specified folder is missing .fmt file for {fmt_path.stem}!')
 
             obj = self.import_component(operator, context, cfg, fmt_path, ib_path, vb_path)
 
@@ -55,7 +55,7 @@ class ObjectImporter:
             imported_objects.append(obj)
         
         if len(imported_objects) == 0:
-            raise ConfigError(cfg, 'object_source_folder', 'Specified folder is missing .fmt files for components!')
+            raise ConfigError('object_source_folder', 'Specified folder is missing .fmt files for components!')
 
         col = new_collection(object_source_folder.stem)
         for obj in imported_objects:
@@ -82,9 +82,9 @@ class ObjectImporter:
             try:
                 extracted_object = read_metadata(object_source_folder / 'Metadata.json')
             except FileNotFoundError:
-                raise ConfigError(cfg, 'object_source_folder', 'Specified folder is missing Metadata.json!')
+                raise ConfigError('object_source_folder', 'Specified folder is missing Metadata.json!')
             except Exception as e:
-                raise ConfigError(cfg, 'object_source_folder', f'Failed to load Metadata.json:\n{e}')
+                raise ConfigError('object_source_folder', f'Failed to load Metadata.json:\n{e}')
             
             vg_remap = None
             if cfg.import_skeleton_type == 'MERGED':

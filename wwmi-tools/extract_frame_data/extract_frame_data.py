@@ -257,9 +257,9 @@ def extract_frame_data(cfg):
     dump_path = resolve_path(cfg.frame_dump_folder)
 
     if not dump_path.is_dir():
-        raise ConfigError(cfg, 'frame_dump_folder', 'Specified dump folder does not exist!')
+        raise ConfigError('frame_dump_folder', 'Specified dump folder does not exist!')
     if not Path(dump_path / 'log.txt').is_file():
-        raise ConfigError(cfg, 'frame_dump_folder', 'Specified dump folder is missing log.txt file!')
+        raise ConfigError('frame_dump_folder', 'Specified dump folder is missing log.txt file!')
     
     # Create data model of the frame dump
     dump = Dump(

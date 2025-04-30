@@ -5,6 +5,8 @@ from typing import List, Dict, Union
 from dataclasses import dataclass, field
 from enum import Enum
 
+from ..addon.exceptions import ConfigError
+
 from ..migoto_io.blender_interface.collections import *
 from ..migoto_io.blender_interface.objects import *
 
@@ -74,9 +76,13 @@ class ObjectMerger:
         unhide_collection(self.collection)
 
         self.initialize_components()
-        self.import_objects_from_collection()
-        self.prepare_temp_objects()
-        self.build_merged_object()
+        try:
+            self.import_objects_from_collection()
+            self.prepare_temp_objects()
+            self.build_merged_object()
+        except Exception as e:
+            self.remove_temp_objects()
+            raise e
         
         if collection_was_hidden:
             hide_collection(self.collection)
@@ -109,6 +115,9 @@ class ObjectMerger:
             if len(match) == 0:
                 continue
             component_id = int(match[0])
+
+            if component_id >= len(self.components):
+                raise ConfigError('object_source_folder', f'Metadata.json in specified folder is missing Component {component_id}!\nMost likely it contains sources for other object.')
 
             temp_obj = copy_object(self.context, obj, name=f'TEMP_{obj.name}', collection=self.collection)
 
@@ -175,6 +184,11 @@ class ObjectMerger:
                 # Update vertex and index count of custom component
                 component.vertex_count += temp_object.vertex_count
                 component.index_count += temp_object.index_count
+
+    def remove_temp_objects(self):
+        for component_id, component in enumerate(self.components):
+            for temp_object in component.objects:
+                remove_mesh(temp_object.object.data)
 
     def build_merged_object(self):
 

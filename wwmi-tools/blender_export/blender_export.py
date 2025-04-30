@@ -66,17 +66,19 @@ class ModExporter:
         try:
             self.extracted_object = read_metadata(self.object_source_folder / 'Metadata.json')
         except FileNotFoundError:
-            raise ConfigError(self.cfg, 'object_source_folder', 'Specified folder is missing Metadata.json!')
+            raise ConfigError('object_source_folder', 'Specified folder is missing Metadata.json!')
         except Exception as e:
-            raise ConfigError(self.cfg, 'object_source_folder', f'Failed to load Metadata.json:\n{e}')
+            raise ConfigError('object_source_folder', f'Failed to load Metadata.json:\n{e}')
 
         user_context = get_user_context(self.context)
 
         try:
             self.build_merged_object()
+        except ConfigError as e:
+            raise e
         except Exception as e:
-            raise ConfigError(self.cfg, 'component_collection', f'Failed to create merged object from collection:\n{e}')
-            
+            raise ConfigError('component_collection', f'Failed to create merged object from collection:\n{e}')
+
         self.build_data_buffers()
 
         if self.cfg.remove_temp_object:
@@ -91,9 +93,9 @@ class ModExporter:
                 try:
                     self.build_mod_ini()
                 except FileNotFoundError:
-                    raise ConfigError(self.cfg, 'custom_template_source', f'Specified custom template file not found!')
+                    raise ConfigError('custom_template_source', f'Specified custom template file not found!')
                 except Exception as e:
-                    raise ConfigError(self.cfg, 'use_custom_template', f'Failed to build mod.ini from custom template:\n{e}')
+                    raise ConfigError('use_custom_template', f'Failed to build mod.ini from custom template:\n{e}')
 
         if self.cfg.custom_template_live_update:
             print(f'Total live ini template initialization time: {time.time() - start_time :.3f}s')
@@ -102,15 +104,15 @@ class ModExporter:
         try:
             self.write_files()
         except Exception as e:
-            raise ConfigError(self.cfg, 'mod_output_folder', f'Failed to write files to mod folder:\n{e}')
+            raise ConfigError('mod_output_folder', f'Failed to write files to mod folder:\n{e}')
 
         print(f'Total mod export time: {time.time() - start_time :.3f}s')
 
     def verify_config(self):
         if self.cfg.component_collection is None:
-            raise ConfigError(self.cfg, 'component_collection', f'Components collection is not specified!')
+            raise ConfigError('component_collection', f'Components collection is not specified!')
         if self.cfg.component_collection not in list(get_scene_collections()):
-            raise ConfigError(self.cfg, 'component_collection', f'Collection "{self.cfg.component_collection.name}" is not a member of "Scene Collection"!')
+            raise ConfigError('component_collection', f'Collection "{self.cfg.component_collection.name}" is not a member of "Scene Collection"!')
 
     def build_merged_object(self):
         start_time = time.time()
