@@ -250,8 +250,7 @@ class NumpyBuffer:
 
 class MigotoFmt:
     def __init__(self, fmt_file: io.IOBase):
-        vb_stride = 0
-        vb_semantics = []
+        vb_elements = []
 
         converters = {
             'SemanticName': lambda value: Semantic(value),
@@ -262,6 +261,7 @@ class MigotoFmt:
 
         element = None
 
+        # Parse fmt
         for line in map(str.strip, fmt_file):
             data = line.split(':')
             if len(data) != 2:
@@ -283,7 +283,7 @@ class MigotoFmt:
             elif line.startswith('element'):
                 if element is not None:
                     if len(element) == 4:
-                        vb_semantics.append(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format']))
+                        vb_elements.append(element)
                     elif len(element) > 0:
                         raise ValueError(f'malformed buffer element format: {element}')
                 element = {}
@@ -292,10 +292,26 @@ class MigotoFmt:
                     if key.startswith(search_key):
                         element[search_key] = converter(value)
                         break
-        if len(element) == 4:
-            vb_semantics.append(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format']))
 
-        self.vb_layout = BufferLayout(vb_semantics)
+        if len(element) == 4:
+            vb_elements.append(element)
+
+        # Calculate per-element stride
+        vb_stride = 0
+        vb_byte_offset = 0
+        for i, element in enumerate(vb_elements):
+            next_element_id = i + 1
+            if len(vb_elements) > next_element_id:
+                next_offset = vb_elements[next_element_id]['AlignedByteOffset']
+            else:
+                next_offset = vb_stride
+            element['Stride'] = next_offset - vb_byte_offset
+            vb_byte_offset = next_offset
+
+        # Build layout
+        self.vb_layout = BufferLayout([])
+        for element in vb_elements:
+            self.vb_layout.add_element(BufferSemantic(AbstractSemantic(element['SemanticName'], element['SemanticIndex']), element['Format'], stride=element['Stride']))
 
         if vb_stride != self.vb_layout.stride:
             raise ValueError(f'vb buffer layout format stride mismatch: {vb_stride} != {self.vb_layout.stride}')
