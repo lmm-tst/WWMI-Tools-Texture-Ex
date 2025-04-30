@@ -174,7 +174,7 @@ class OutputBuilder:
                 'Color': ExtractedObjectBuffer([
                     ExtractedObjectBufferSemantic(Semantic.Color, 0, DXGIFormat.R8G8B8A8_UNORM)
                 ]),
-                'Vector': ExtractedObjectBuffer([
+                'TexCoord': ExtractedObjectBuffer([
                     ExtractedObjectBufferSemantic(Semantic.TexCoord, 0, DXGIFormat.R16G16_FLOAT),
                     ExtractedObjectBufferSemantic(Semantic.Color, 1, DXGIFormat.R16G16_UNORM),
                     ExtractedObjectBufferSemantic(Semantic.TexCoord, 1, DXGIFormat.R16G16_FLOAT),
