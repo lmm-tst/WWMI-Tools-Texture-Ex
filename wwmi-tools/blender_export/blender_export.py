@@ -25,7 +25,6 @@ from .data_models.data_model_wwmi import DataModelWWMI
 class Fatal(Exception): pass
 
 
-# TODO: Add support of buffers_format override, including ability to add .fmt for extra buffers
 data_models: Dict[str, DataModel] = {
     'WWMI': DataModelWWMI(),
 }
@@ -134,12 +133,19 @@ class ModExporter:
         global data_models
         data_model = data_models['WWMI']
 
+        buffers_format = None
+        if self.extracted_object.export_format is not None and len(self.extracted_object.export_format) > 0:
+            buffers_format = {}
+            for buffer_name, buffer_layout in self.extracted_object.export_format.items():
+                buffers_format[buffer_name] = buffer_layout.get_layout()
+
         self.buffers, vertex_count = data_model.get_data(
             self.context, 
             self.cfg.component_collection, 
             self.merged_object.object, 
             self.merged_object.mesh, 
             self.excluded_buffers,
+            buffers_format,
             self.cfg.mirror_mesh)
 
         self.merged_object.vertex_count = vertex_count
