@@ -71,9 +71,9 @@ class ResourceCollector:
                 txt_path = resource.path.replace('.buf', '.txt')
                 resource = ResourceDescriptor(txt_path)
 
-            resource_hash = resource.get_sha256()
+            cache_id = (resource.get_sha256(), layout.to_string())
 
-            cached_resource = self.cache.get(resource_hash, None)
+            cached_resource = self.cache.get(cache_id, None)
 
             if cached_resource is None:
                 if source.slot_type == SlotType.IndexBuffer and source.file_ext == 'txt':
@@ -82,7 +82,7 @@ class ResourceCollector:
                 else:
                     resource = ByteBuffer(layout, resource.get_bytes())
 
-                self.cache[resource_hash] = resource
+                self.cache[cache_id] = resource
             else:
                 resource = cached_resource
 

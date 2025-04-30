@@ -165,6 +165,13 @@ configuration = Configuration(
                 BufferSemantic(AbstractSemantic(Semantic.Blendindices, 0), DXGIFormat.R8G8B8A8_UINT),
                 BufferSemantic(AbstractSemantic(Semantic.Blendweight, 0), DXGIFormat.R8G8B8A8_UNORM),
             ], force_stride=True)),
+        'BLEND_BUFFER_WIDE': DataMap([
+                Source('DRAW_VS', ShaderType.Empty, SlotType.VertexBuffer, SlotId(4)),
+            ],
+            BufferLayout([
+                BufferSemantic(AbstractSemantic(Semantic.Blendindices, 0), DXGIFormat.R8_UINT, stride=8),
+                BufferSemantic(AbstractSemantic(Semantic.Blendweight, 0), DXGIFormat.R8_UNORM, stride=8),
+            ], force_stride=True)),
         
         'TEXTURE_0': DataMap([Source('DRAW_VS', ShaderType.Pixel, SlotType.Texture, SlotId(0), ignore_missing=True)]),
         'TEXTURE_1': DataMap([Source('DRAW_VS', ShaderType.Pixel, SlotType.Texture, SlotId(1), ignore_missing=True)]),

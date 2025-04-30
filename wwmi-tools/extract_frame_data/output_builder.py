@@ -5,11 +5,12 @@ from typing import List, Dict
 from pathlib import Path
 
 from ..migoto_io.data_model.dxgi_format import DXGIFormat
+from ..migoto_io.data_model.byte_buffer import Semantic, AbstractSemantic
 from ..migoto_io.dump_parser.filename_parser import ResourceDescriptor
 
 from .shapekey_builder import ShapeKeys
 from .component_builder import MeshObject
-from .metadata_format import ExtractedObject, ExtractedObjectComponent, ExtractedObjectShapeKeys
+from .metadata_format import ExtractedObject, ExtractedObjectComponent, ExtractedObjectShapeKeys, ExtractedObjectBuffer, ExtractedObjectBufferSemantic
 
 
 @dataclass
@@ -122,7 +123,11 @@ class OutputBuilder:
             component.textures = textures
 
     @staticmethod
-    def build_metadata(mesh_object, shapekeys):
+    def build_metadata(mesh_object: MeshObject, shapekeys):
+        vertex_buffer_layout = next(iter(mesh_object.components)).vertex_buffer.layout
+        vg_index_stride = vertex_buffer_layout.get_element(AbstractSemantic(Semantic.Blendindices)).stride
+        vg_weight_stride = vertex_buffer_layout.get_element(AbstractSemantic(Semantic.Blendweight)).stride
+
         return ExtractedObject(
 
             vb0_hash=mesh_object.vb0_hash,
@@ -149,6 +154,42 @@ class OutputBuilder:
                 dispatch_y=shapekeys.dispatch_y,
                 checksum=sum(shapekeys.shapekey_offsets[0:4]),
             ) if shapekeys is not None else ExtractedObjectShapeKeys(),
+
+            export_format={
+                'Index': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.Index, 0, DXGIFormat.R32_UINT, stride=12)
+                ]),
+                'Position': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.Position, 0, DXGIFormat.R32G32B32_FLOAT)
+                ]),
+                'Blend': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.Blendindices, 0, DXGIFormat.R8_UINT, stride=vg_index_stride),
+                    ExtractedObjectBufferSemantic(Semantic.Blendweight, 0, DXGIFormat.R8_UINT, stride=vg_weight_stride),
+                ]),
+                'Vector': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.Tangent, 0, DXGIFormat.R8G8B8A8_SNORM),
+                    ExtractedObjectBufferSemantic(Semantic.Normal, 0, DXGIFormat.R8G8B8_SNORM),
+                    ExtractedObjectBufferSemantic(Semantic.BitangentSign, 0, DXGIFormat.R8_SNORM),
+                ]),
+                'Color': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.Color, 0, DXGIFormat.R8G8B8A8_UNORM)
+                ]),
+                'Vector': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.TexCoord, 0, DXGIFormat.R16G16_FLOAT),
+                    ExtractedObjectBufferSemantic(Semantic.Color, 1, DXGIFormat.R16G16_UNORM),
+                    ExtractedObjectBufferSemantic(Semantic.TexCoord, 1, DXGIFormat.R16G16_FLOAT),
+                    ExtractedObjectBufferSemantic(Semantic.TexCoord, 2, DXGIFormat.R16G16_FLOAT),
+                ]),
+                'ShapeKeyOffset': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.ShapeKey, 0, DXGIFormat.R32G32B32A32_UINT)
+                ]),
+                'ShapeKeyVertexId': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.ShapeKey, 1, DXGIFormat.R32_UINT)
+                ]),
+                'ShapeKeyVertexOffset': ExtractedObjectBuffer([
+                    ExtractedObjectBufferSemantic(Semantic.ShapeKey, 2, DXGIFormat.R16_FLOAT)
+                ]),
+            }
             
         ).as_json()
 

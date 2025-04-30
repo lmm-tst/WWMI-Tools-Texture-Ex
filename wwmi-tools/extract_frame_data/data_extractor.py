@@ -148,8 +148,13 @@ class DataExtractor:
                 blend_buffer = branch_call.resources['BLEND_BUFFER']
 
                 if blend_buffer.num_elements != position_buffer.num_elements:
-                    print(f'Object type not recognized for call {branch_call.call}')
-                    continue
+                    
+                    blend_buffer_wide = branch_call.resources['BLEND_BUFFER_WIDE']
+                    if blend_buffer_wide.num_elements == position_buffer.num_elements:
+                        blend_buffer = blend_buffer_wide
+                    else:
+                        print(f'Object type not recognized for call {branch_call.call}')
+                        continue
 
                 vector_buffer = branch_call.resources['VECTOR_BUFFER']
 

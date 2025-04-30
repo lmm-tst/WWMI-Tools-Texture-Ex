@@ -104,6 +104,16 @@ class MeshObject:
         """
         Compiles component data from multiple sources into single export-optimized object
         """
+
+        # Temp hacky way to build new layout for wide blend buffer, extraction rewrite is pending anyways
+        if draw_data.blend_buffer.layout.stride == 16:
+            vb_layout = BufferLayout([])
+            vb_layout.merge(draw_data.position_buffer.layout)
+            vb_layout.merge(draw_data.vector_buffer.layout)
+            vb_layout.merge(draw_data.blend_buffer.layout)
+            vb_layout.merge(draw_data.color_buffer.layout)
+            vb_layout.merge(draw_data.texcoord_buffer.layout)
+
         shapekey_buffer = None
         if self.shapekey_data is not None:
             # Fetch associated shapekeys data
