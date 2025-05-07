@@ -107,7 +107,7 @@ class BlenderDataExtractor:
             elif export_semantic.abstract.enum not in [Semantic.Blendindices, Semantic.Blendweight]:
                 # Only blends can be directly exported with any bitness and padding, because they aren't extracted with foreach_get
                 # Other semantics may require conversion:
-                if export_format.num_values != export_format.num_values:
+                if export_format.num_values != blender_format.num_values:
                     # Export formats with different number of values per row and cannot be filled by foreach_get directly
                     proxy_semantic.format = blender_format
                     proxy_semantic.stride = blender_format.byte_width
