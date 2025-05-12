@@ -1,6 +1,7 @@
 import time
 import json
 import numpy
+import copy
 import bpy
 
 from typing import Tuple, List, Dict, Optional, Union
@@ -207,8 +208,8 @@ class DataModel:
 
         # Copy default converters
         semantic_converters, format_converters = {}, {}
-        semantic_converters.update(self.semantic_converters)
-        format_converters.update(self.format_converters)
+        semantic_converters.update(copy.deepcopy(self.semantic_converters))
+        format_converters.update(copy.deepcopy(self.format_converters))
 
         # Add generic converters
         for semantic in export_layout.semantics:
