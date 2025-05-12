@@ -71,7 +71,7 @@ class DataModelWWMI(DataModel):
                  excluded_buffers: List[str],
                  buffers_format: Optional[Dict[Semantic, DXGIFormat]] = None,
                  mirror_mesh: bool = False) -> Tuple[Dict[str, NumpyBuffer], int]:
-        
+
         if buffers_format is None:
             buffers_format = self.buffers_format
 
