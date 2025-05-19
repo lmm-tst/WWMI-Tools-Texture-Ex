@@ -133,15 +133,15 @@ class AddonUpdaterInstallPopup(bpy.types.Operator):
     # if true, run clean install - ie remove all files before adding new
     # equivalent to deleting the addon and reinstalling, except the
     # updater folder/backup folder remains
-    clean_install = bpy.props.BoolProperty(
+    clean_install: bpy.props.BoolProperty(
         name="Clean install",
         description=("If enabled, completely clear the addon's folder before "
                      "installing new update, creating a fresh install"),
         default=False,
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
-    ignore_enum = bpy.props.EnumProperty(
+    ignore_enum: bpy.props.EnumProperty(
         name="Process update",
         description="Decide to install, ignore, or defer new addon update",
         items=[
@@ -150,7 +150,7 @@ class AddonUpdaterInstallPopup(bpy.types.Operator):
             ("defer", "Defer", "Defer choice till next blender session")
         ],
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
     def check(self, context):
         return True
@@ -274,13 +274,13 @@ class AddonUpdaterUpdateNow(bpy.types.Operator):
     # If true, run clean install - ie remove all files before adding new
     # equivalent to deleting the addon and reinstalling, except the updater
     # folder/backup folder remains.
-    clean_install = bpy.props.BoolProperty(
+    clean_install: bpy.props.BoolProperty(
         name="Clean install",
         description=("If enabled, completely clear the addon's folder before "
                      "installing new update, creating a fresh install"),
         default=False,
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
     def execute(self, context):
 
@@ -345,22 +345,22 @@ class AddonUpdaterUpdateTarget(bpy.types.Operator):
             i += 1
         return ret
 
-    target = bpy.props.EnumProperty(
+    target: bpy.props.EnumProperty(
         name="Target version to install",
         description="Select the version to install",
         items=target_version
-    )
+    )  #type: ignore
 
     # If true, run clean install - ie remove all files before adding new
     # equivalent to deleting the addon and reinstalling, except the
     # updater folder/backup folder remains.
-    clean_install = bpy.props.BoolProperty(
+    clean_install: bpy.props.BoolProperty(
         name="Clean install",
         description=("If enabled, completely clear the addon's folder before "
                      "installing new update, creating a fresh install"),
         default=False,
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
     @classmethod
     def poll(cls, context):
@@ -411,11 +411,11 @@ class AddonUpdaterInstallManually(bpy.types.Operator):
     bl_description = "Proceed to manually install update"
     bl_options = {'REGISTER', 'INTERNAL'}
 
-    error = bpy.props.StringProperty(
+    error: bpy.props.StringProperty(
         name="Error Occurred",
         default="",
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
     def invoke(self, context, event):
         return context.window_manager.invoke_popup(self)
@@ -477,13 +477,14 @@ class AddonUpdaterUpdatedSuccessful(bpy.types.Operator):
     bl_description = "Update installation response"
     bl_options = {'REGISTER', 'INTERNAL', 'UNDO'}
 
-    error = bpy.props.StringProperty(
+    error: bpy.props.StringProperty(
         name="Error Occurred",
         default="",
         options={'HIDDEN'}
-    )
+    )  #type: ignore
 
     def invoke(self, context, event):
+        # Make sure error is correctly accessed via instance property
         return context.window_manager.invoke_props_popup(self, event)
 
     def draw(self, context):
@@ -494,14 +495,12 @@ class AddonUpdaterUpdatedSuccessful(bpy.types.Operator):
             return
 
         saved = updater.json
-        if self.error != "":
+
+        if self.error:
             col = layout.column()
             col.scale_y = 0.7
             col.label(text="Error occurred, did not install", icon="ERROR")
-            if updater.error_msg:
-                msg = updater.error_msg
-            else:
-                msg = self.error
+            msg = updater.error_msg if updater.error_msg else self.error
             col.label(text=str(msg), icon="BLANK1")
             rw = col.row()
             rw.scale_y = 2
