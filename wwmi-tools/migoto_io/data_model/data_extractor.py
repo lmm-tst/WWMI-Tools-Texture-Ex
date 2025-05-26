@@ -250,19 +250,18 @@ class BlenderDataExtractor:
             if semantic == Semantic.Position:
                 data = self.fetch_data(mesh.vertices, 'undeformed_co', numpy_type, size)
             elif semantic == Semantic.Blendindices:
-                stride = buffer_semantic.stride
-                data = numpy.array([[vg.group for vg in groups][:stride] + [0] * (stride - len(groups))
+                num_vgs = int(buffer_semantic.stride / buffer_semantic.format.value_byte_width)
+                data = numpy.array([[vg.group for vg in groups][:num_vgs] + [0] * (num_vgs - len(groups))
                                     for groups in vertex_groups], dtype=numpy_type[0])
             elif semantic == Semantic.Blendweight:
-                stride = buffer_semantic.stride
+                num_vgs = int(buffer_semantic.stride / buffer_semantic.format.value_byte_width)
                 # TODO: Try to load data into the empty numpy instead of inline padding, it may be faster
                 if buffer_semantic.format.value_byte_width > 1:
-                    data = numpy.array([[vg.weight for vg in groups][:stride] + [0] * (stride - len(groups))
+                    data = numpy.array([[vg.weight for vg in groups][:num_vgs] + [0] * (num_vgs - len(groups))
                                         for groups in vertex_groups], dtype=numpy_type[0])
                 else:
-                    data = numpy.array([self.normalize_8bit_weights([vg.weight for vg in groups][:stride]) + [0] * (stride - len(groups))
+                    data = numpy.array([self.normalize_8bit_weights([vg.weight for vg in groups][:num_vgs]) + [0] * (num_vgs - len(groups))
                                         for groups in vertex_groups], dtype=numpy_type[0])
-
             else:
                 continue
 
