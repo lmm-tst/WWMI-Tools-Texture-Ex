@@ -188,7 +188,9 @@ class NumpyBuffer:
         else:
             return self.data[indices]
 
-    def get_field(self, field: str) -> numpy.ndarray:
+    def get_field(self, field: Union[str, int]) -> numpy.ndarray:
+        if isinstance(field, int):
+            field = self.layout.semantics[field].get_name()
         return self.data[field]
 
     def remove_duplicates(self, keep_order = True):

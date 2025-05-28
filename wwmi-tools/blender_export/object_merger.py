@@ -34,6 +34,8 @@ class MergedObjectComponent:
     objects: List[TempObject]
     vertex_count: int = 0
     index_count: int = 0
+    blend_remap_id: int = -1
+    blend_remap_vg_count: int = 0
     
     def get_object(self, object_name):
         for obj in self.objects:
@@ -56,6 +58,7 @@ class MergedObject:
     vertex_count: int = 0
     index_count: int = 0
     vg_count: int = 0
+    blend_remap_count: int = 0
 
 
 @dataclass

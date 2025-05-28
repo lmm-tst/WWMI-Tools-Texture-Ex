@@ -2,6 +2,8 @@ import time
 import re
 import numpy
 import bpy
+import json
+
 
 from typing import Tuple, List, Dict, Optional
 
@@ -70,16 +72,32 @@ class DataModelWWMI(DataModel):
                  mesh: bpy.types.Mesh, 
                  excluded_buffers: List[str],
                  buffers_format: Optional[Dict[Semantic, DXGIFormat]] = None,
-                 mirror_mesh: bool = False) -> Tuple[Dict[str, NumpyBuffer], int]:
+                 mirror_mesh: bool = False,
+                 object_index_layout: Optional[List[int]] = None) -> Tuple[Dict[str, NumpyBuffer], int, Optional[List[int]]]:
 
         if buffers_format is None:
             buffers_format = self.buffers_format
 
-        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, buffers_format, mirror_mesh)
+        build_blend_remaps = object_index_layout is not None and 'Blend' not in excluded_buffers
+
+        if build_blend_remaps:
+            buffers_format['BlendRemapVertexVG'] = BufferLayout([
+                BufferSemantic(AbstractSemantic(Semantic.Blendindices, 1), DXGIFormat.R16_UINT, stride=8),
+            ])
+
+        index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, buffers_format, mirror_mesh, build_blend_remaps)
 
         buffers = self.build_buffers(index_data, vertex_buffer, excluded_buffers, buffers_format)
 
         vertex_ids = vertex_buffer.get_field(AbstractSemantic(Semantic.VertexId).get_name())
+
+        if build_blend_remaps:
+            blend_buffer = buffers.get('Blend', None)
+            if blend_buffer is not None:
+                index_buffer = buffers.get('Index', None)
+                vg_buffer = buffers.get('BlendRemapVertexVG', None)
+                blend_remaps = self.build_blend_remap(context, object_index_layout, index_buffer, blend_buffer, vg_buffer)
+                buffers.update(blend_remaps)
 
         shapekeys = self.export_shapekeys(obj, vertex_ids, excluded_buffers, mirror_mesh)
         buffers.update(shapekeys)
@@ -164,3 +182,86 @@ class DataModelWWMI(DataModel):
         print(f'Shape Keys formatting time: {time.time() - start_time :.3f}s ({len(shapekey_vertex_ids)} shapekeyed vertices)')
 
         return buffers
+
+    def build_blend_remap(self, 
+                         context: bpy.types.Context, 
+                         index_layout: List[int], 
+                         index_buffer: NumpyBuffer,
+                         blend_buffer: NumpyBuffer,
+                         vg_buffer: NumpyBuffer) -> Dict[str, NumpyBuffer]:
+        
+        start_time = time.time()
+
+        remapped_vgs_counts = []
+
+        if context.scene.wwmi_tools_settings.index_data_cache:
+            # Partial export is enabled and index buffer cache exists, lets load it
+            index_data = numpy.array(json.loads(context.scene.wwmi_tools_settings.index_data_cache)).ravel()
+        else:
+            if index_buffer is None:
+                raise ValueError(f'Failed to build blend remap: `Index` buffer does not exist!')
+            index_data = index_buffer.get_field(0).ravel()
+
+        vg_ids = vg_buffer.get_field(vg_buffer.layout.get_element(AbstractSemantic(Semantic.Blendindices, 1)).get_name())
+        vg_weights = blend_buffer.get_field(blend_buffer.layout.get_element(AbstractSemantic(Semantic.Blendweight, 0)).get_name())
+        
+        blend_remap_forward = numpy.empty(0, dtype=numpy.uint16)
+        blend_remap_reverse = numpy.empty(0, dtype=numpy.uint16)
+
+        index_offset = 0
+        for index_count in index_layout:
+            vertex_ids = index_data[index_offset:index_offset+index_count]
+            vertex_ids = numpy.unique(vertex_ids)
+
+            obj_vg_ids = vg_ids[vertex_ids].flatten()
+            
+            if numpy.max(obj_vg_ids) < 256:
+                index_offset += index_count
+                remapped_vgs_counts.append(0)
+                continue
+
+            obj_vg_weights = vg_weights[vertex_ids].flatten()
+            non_zero_idx = numpy.nonzero(obj_vg_weights > 0)[0]
+
+            obj_vg_ids = obj_vg_ids[non_zero_idx]
+            obj_vg_ids = numpy.unique(obj_vg_ids)
+
+            if numpy.max(obj_vg_ids) < 256:
+                index_offset += index_count
+                remapped_vgs_counts.append(0)
+                continue
+            
+            remapped_vgs_counts.append(len(obj_vg_ids))
+
+            forward = numpy.zeros(512, dtype=numpy.uint16)
+            forward[numpy.arange(len(obj_vg_ids))] = obj_vg_ids
+
+            reverse = numpy.zeros(512, dtype=numpy.uint16)
+
+            reverse[obj_vg_ids] = numpy.arange(len(obj_vg_ids))
+
+            blend_remap_forward = numpy.concatenate((blend_remap_forward, forward), axis=0)
+            blend_remap_reverse = numpy.concatenate((blend_remap_reverse, reverse), axis=0)
+
+            index_offset += index_count
+
+        buffers = {}
+
+        buffers['BlendRemapForward'] = NumpyBuffer(BufferLayout([
+            BufferSemantic(AbstractSemantic(Semantic.RawData, 0), DXGIFormat.R16_UINT),
+        ]))
+        buffers['BlendRemapReverse'] = NumpyBuffer(BufferLayout([
+            BufferSemantic(AbstractSemantic(Semantic.RawData, 1), DXGIFormat.R16_UINT),
+        ]))
+        buffers['BlendRemapLayout'] = NumpyBuffer(BufferLayout([
+            BufferSemantic(AbstractSemantic(Semantic.RawData, 2), DXGIFormat.R32_UINT),
+        ]))
+
+        buffers['BlendRemapForward'].set_data(blend_remap_forward)
+        buffers['BlendRemapReverse'].set_data(blend_remap_reverse)
+        buffers['BlendRemapLayout'].set_data(numpy.array(remapped_vgs_counts))
+
+        print(f'Blend remap time: {time.time() - start_time :.3f}s ({int(len(blend_remap_forward) / 512)} remaps)')
+
+        return buffers
+    

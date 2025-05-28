@@ -78,12 +78,14 @@ class ModExporter:
         except Exception as e:
             raise ConfigError('component_collection', f'Failed to create merged object from collection:\n{e}')
 
-        self.build_data_buffers()
-
-        if self.cfg.remove_temp_object:
-            remove_mesh(self.merged_object.object.data)
-
-        set_user_context(self.context, user_context)
+        try:
+            self.build_data_buffers()
+        except Exception as e:
+            raise e
+        finally:
+            if self.cfg.remove_temp_object:
+                remove_mesh(self.merged_object.object.data)
+            set_user_context(self.context, user_context)
 
         if not self.cfg.partial_export:
             self.textures = get_textures(self.object_source_folder)
@@ -94,7 +96,7 @@ class ModExporter:
                 except FileNotFoundError:
                     raise ConfigError('custom_template_source', f'Specified custom template file not found!')
                 except Exception as e:
-                    raise ConfigError('use_custom_template', f'Failed to build mod.ini from custom template:\n{e}')
+                    raise ConfigError('use_custom_template', f'Failed to build mod.ini from ini template:\n{e}')
 
         if self.cfg.custom_template_live_update:
             print(f'Total live ini template initialization time: {time.time() - start_time :.3f}s')
@@ -139,6 +141,13 @@ class ModExporter:
             for buffer_name, buffer_layout in self.extracted_object.export_format.items():
                 buffers_format[buffer_name] = buffer_layout.get_layout()
 
+        index_layout = None
+        if len(self.merged_object.object.vertex_groups) > 256:
+            index_layout = []
+            for component in self.merged_object.components:
+                if component.index_count > 0:
+                    index_layout.append(component.index_count)
+                
         self.buffers, vertex_count = data_model.get_data(
             self.context, 
             self.cfg.component_collection, 
@@ -146,13 +155,30 @@ class ModExporter:
             self.merged_object.mesh, 
             self.excluded_buffers,
             buffers_format,
-            self.cfg.mirror_mesh)
+            self.cfg.mirror_mesh,
+            index_layout)
 
         self.merged_object.vertex_count = vertex_count
         self.merged_object.shapekeys.vertex_count = len(self.buffers.get('ShapeKeyVertexId', []))
 
-        print(f'Total mesh data collection time: {time.time() - start_time :.3f}s')
+        remapped_vgs_counts = self.buffers.pop('BlendRemapLayout', None)
+        if remapped_vgs_counts is not None:
+            remap_id = 0
+            for component_id, vg_count in enumerate(remapped_vgs_counts.data.tolist()):
+                if vg_count == 0:
+                    continue
+                component = self.merged_object.components[component_id]
+                if vg_count > 256:            
+                    raise ConfigError('component_collection', f'Component{component_id} 256 VG limit exceeded!\n'
+                                      f'Currently it consists of {len(component.objects)} object(s) using total of {vg_count} VGs with non-zero weights.\n'
+                                      f'Please reduce the number of non-empty VGs or split objects between different components.')
+                component.blend_remap_id = remap_id
+                component.blend_remap_vg_count = vg_count
+                remap_id += 1
+            self.merged_object.blend_remap_count = remap_id
 
+        print(f'Total mesh data collection time: {time.time() - start_time :.3f}s')
+    
     def build_mod_ini(self):
         start_time = time.time()
 
