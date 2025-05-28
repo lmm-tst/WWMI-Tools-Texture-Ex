@@ -9,6 +9,8 @@ class ConfigError(Exception):
         cfg.last_error_text = error_message
         print('ERROR:', error_message)
         super().__init__(error_message)
+        import traceback
+        print(traceback.format_exc())
 
 
 def clear_error(cfg):
