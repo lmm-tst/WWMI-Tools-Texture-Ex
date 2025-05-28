@@ -48,8 +48,8 @@ class DataModel:
 
         # Copy default converters
         semantic_converters, format_converters = {}, {}
-        semantic_converters.update(self.semantic_converters)
-        format_converters.update(self.format_converters)
+        semantic_converters.update(copy.deepcopy(self.semantic_converters))
+        format_converters.update(copy.deepcopy(self.format_converters))
 
         # Add generic converters
 
@@ -93,7 +93,8 @@ class DataModel:
                  mesh: bpy.types.Mesh, 
                  excluded_buffers: List[str], 
                  buffers_format: Optional[Dict[Semantic, DXGIFormat]] = None,
-                 mirror_mesh: bool = False) -> Tuple[Dict[str, NumpyBuffer], int]:
+                 mirror_mesh: bool = False,
+                 object_index_layout: Optional[List[int]] = None) -> Tuple[Dict[str, NumpyBuffer], int, Optional[List[int]]]:
         
         if buffers_format is None:
             buffers_format = self.buffers_format
@@ -118,7 +119,7 @@ class DataModel:
             if buffer_name in excluded_buffers:
                 continue
             for semantic in buffer_layout.semantics:
-                if semantic.abstract.enum == Semantic.ShapeKey:
+                if semantic.abstract.enum in (Semantic.ShapeKey, Semantic.RawData):
                     continue
                 if semantic.abstract.enum == Semantic.Index:
                     data = index_data
@@ -141,10 +142,11 @@ class DataModel:
                     mesh: bpy.types.Mesh, 
                     excluded_buffers: List[str], 
                     buffers_format: Dict[Semantic, DXGIFormat],
-                    mirror_mesh: bool = False):
+                    mirror_mesh: bool = False,
+                    cache_index_data: bool = False):
         
         export_layout, fetch_loop_data = self.make_export_layout(buffers_format, excluded_buffers)
-        index_data, vertex_buffer = self.get_mesh_data(context, collection, mesh, export_layout, fetch_loop_data, mirror_mesh)
+        index_data, vertex_buffer = self.get_mesh_data(context, collection, mesh, export_layout, fetch_loop_data, mirror_mesh, cache_index_data)
         return index_data, vertex_buffer
 
     def make_export_layout(self, 
@@ -168,7 +170,7 @@ class DataModel:
             for semantic in buffer_layout.semantics:
                 if exclude_buffer and semantic.abstract.enum not in self.data_extractor.blender_loop_semantics:
                     continue
-                if semantic.abstract.enum == Semantic.ShapeKey:
+                if semantic.abstract.enum in [Semantic.ShapeKey, Semantic.RawData]:
                     continue
                 export_layout.add_element(semantic)
 
@@ -180,7 +182,8 @@ class DataModel:
                       mesh: bpy.types.Mesh, 
                       export_layout: BufferLayout, 
                       fetch_loop_data: bool, 
-                      mirror_mesh: bool = False):
+                      mirror_mesh: bool = False,
+                      cache_index_data: bool = False):
         
         vertex_ids_cache, cache_vertex_ids = None, False
 
@@ -205,6 +208,7 @@ class DataModel:
         elif context.scene.wwmi_tools_settings.vertex_ids_cache:
             # We're going to fetch loop data, cache must be cleared
             context.scene.wwmi_tools_settings.vertex_ids_cache = ''
+            context.scene.wwmi_tools_settings.index_data_cache = ''
 
         # Copy default converters
         semantic_converters, format_converters = {}, {}
@@ -237,6 +241,8 @@ class DataModel:
             # As vertex_ids_cache is None, get_data fetched loop data for us and we can cache vertex ids
             vertex_ids = vertex_buffer.get_field(AbstractSemantic(Semantic.VertexId).get_name())
             context.scene.wwmi_tools_settings.vertex_ids_cache = json.dumps(vertex_ids.tolist())
+            if cache_index_data:
+                context.scene.wwmi_tools_settings.index_data_cache = json.dumps(index_buffer.tolist())
             context.scene.wwmi_tools_settings.vertex_ids_cached_collection = collection
 
         return index_buffer, vertex_buffer
