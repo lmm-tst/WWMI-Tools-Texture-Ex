@@ -6,7 +6,10 @@ from .. import bl_info
 from .. import __name__ as package_name
 from .. import addon_updater_ops
 
+from .modules.ini_toggles.props import IniToggles
+
 from .exceptions import clear_error
+
 
 class WWMI_Settings(bpy.types.PropertyGroup):
 
@@ -25,7 +28,12 @@ class WWMI_Settings(bpy.types.PropertyGroup):
     ) # type: ignore
 
     vertex_ids_cache: bpy.props.StringProperty(
-        name = "Loop Data Cache",
+        name = "Vertex Ids Cache",
+        default = ""
+    ) # type: ignore
+
+    index_data_cache: bpy.props.StringProperty(
+        name = "Index Data Cache",
         default = ""
     ) # type: ignore
     
@@ -336,6 +344,17 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         description="Text of last error.",
         default='Collection must be filled!',
     ) # type: ignore
+
+    use_ini_toggles: BoolProperty(
+        name="Use Ini Toggles",
+        description="Add configured Ini Toggles logic to mod.ini",
+        default=False,
+    ) # type: ignore
+
+    ini_toggles: bpy.props.PointerProperty(
+        type=IniToggles,
+    ) # type: ignore
+
 
 
 class Preferences(bpy.types.AddonPreferences):
