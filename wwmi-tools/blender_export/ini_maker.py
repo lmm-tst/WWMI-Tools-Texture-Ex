@@ -22,6 +22,7 @@ from ..extract_frame_data.metadata_format import ExtractedObject
 from .object_merger import MergedObject, SkeletonType
 from .metadata_collector import Version, ModInfo
 from .texture_collector import Texture
+from .text_formatter import TextFormatter
 
 from ..libs.jinja2 import Template, TemplateSyntaxError, UndefinedError
 
@@ -42,6 +43,7 @@ class IniMaker:
     comment_code: bool
     unrestricted_custom_shape_keys: bool
     skeleton_scale: float
+    formatter: TextFormatter = TextFormatter()
     # Output
     ini_string: str = field(init=False)
     
