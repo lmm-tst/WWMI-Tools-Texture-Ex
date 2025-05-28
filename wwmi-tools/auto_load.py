@@ -38,7 +38,10 @@ def register():
 
 def unregister():
     for cls in reversed(ordered_classes):
-        bpy.utils.unregister_class(cls)
+        try:
+            bpy.utils.unregister_class(cls)
+        except Exception as e:
+            raise Exception(f'Failed to unregister class {str(cls)}: {e}') from e
 
     for module in modules:
         if module.__name__ == __name__:
