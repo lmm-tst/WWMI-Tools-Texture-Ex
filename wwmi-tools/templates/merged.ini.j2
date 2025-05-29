@@ -11,7 +11,9 @@
 
 [KeySwap{{ formatter.format_name_camel_case(var.name) }}]
 condition = $object_detected == 1
-key = {{ var.get_hotkeys() | join(' ') }}
+{%- for hotkeys in formatter.format_hotkeys(var.hotkeys) %}
+key = {{ hotkeys }}
+{%- endfor %}
 type = cycle
 {{ formatter.format_ini_swapvar(var.name) }} = {{ var.states | map(attribute='name') | join(', ') }}
 {%- endif -%}
