@@ -26,7 +26,7 @@ class ToggleVarStateCondition(bpy.types.PropertyGroup):
     ) # type: ignore
 
     var: bpy.props.StringProperty(
-        description = "Variable to compare with state value",
+        description = "Variable to compare with state value.\nHint: Add `$` prefix to Custom var `name` to prevent its auto-formatting to `$swapvar_name`",
     ) # type: ignore
     operator: bpy.props.EnumProperty(
         description = "Controls how variable must be compared to specified value for condition to return TRUE",
@@ -45,7 +45,12 @@ class ToggleVarStateCondition(bpy.types.PropertyGroup):
     ) # type: ignore
 
     def __str__(self):
-        return f"{text_formatter.format_ini_swapvar(self.var)} {self.operator} {self.state}"
+        var_name = self.var.strip()
+        if self.type == 'EXTERNAL' and var_name.startswith('$'):
+            pass  # Use var name as it is, without any formatting
+        else:
+            var_name = text_formatter.format_ini_swapvar(var_name)
+        return f"{var_name} {self.operator} {self.state}"
 
 
 class ToggleVarStateObject(bpy.types.PropertyGroup):
@@ -118,6 +123,7 @@ class ToggleVar(bpy.types.PropertyGroup):
     ) # type: ignore
     hotkeys: bpy.props.StringProperty(
         name = "Hotkeys",
+        description = "Keybinding used to switch var between its states. Use whitespace as separator for key combination and `;` to separate multiple keybindings for same var",
     ) # type: ignore
     ui_expanded: bpy.props.BoolProperty(
         name = "Toggle folding",
@@ -210,7 +216,13 @@ class ToggleVar(bpy.types.PropertyGroup):
 
         self.states.move(scr_idx, dst_idx)
 
+    def get_formatted_hotkeys(self, join_arg=' '):
+        return text_formatter.format_hotkeys(self.hotkeys, join_arg=join_arg)
+
     def get_hotkeys(self):
+        """
+        Deprecated: use get_formatted_hotkeys instead
+        """
         return text_formatter.extract_hotkeys_parts(self.hotkeys)
 
 

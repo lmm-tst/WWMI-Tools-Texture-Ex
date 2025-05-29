@@ -45,11 +45,7 @@ class WWMI_TOOLS_PT_SidePanelIniToggles(bpy.types.Panel):
 
             row.prop(var, "ui_expanded", icon="TRIA_DOWN" if var.ui_expanded else "TRIA_RIGHT", emboss=False, text="")
 
-            hotkeys = var.get_hotkeys()
-            if len(hotkeys) > 0:
-                hotkeys = f"[{'+'.join(hotkeys)}]"
-            else:
-                hotkeys = ""
+            hotkeys = " ".join([f"[{binding}]" for binding in var.get_formatted_hotkeys(join_arg='+')])
 
             if var.ui_expanded:
                 split = row.split(factor=0.7)
@@ -228,7 +224,13 @@ class WWMI_TOOLS_OT_EditToggleVar(bpy.types.Operator):
         box = layout.box()
         
         row = box.row()
-        row.prop(var, "hotkeys")
+        
+        split = row.split(factor=0.7)
+        
+        split.prop(var, "hotkeys")
+
+        op = split.operator("wm.url_open", text="Key Codes", icon='HELP')
+        op.url = "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes"
 
         row = box.row()
         row.prop_search(var, "default_state", var, "states")

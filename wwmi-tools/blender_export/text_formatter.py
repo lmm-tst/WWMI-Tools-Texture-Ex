@@ -47,5 +47,5 @@ class TextFormatter:
         parts = [x for x in map(str.upper, map(str.strip, hotkeys.split(' '))) if x]
         return parts
 
-    def format_hotkeys(self, hotkeys):
-        return ' '.join(self.extract_hotkeys_parts(hotkeys))
+    def format_hotkeys(self, hotkeys, join_arg=' '):
+        return [join_arg.join(self.extract_hotkeys_parts(binding)) for binding in hotkeys.split(';')]
