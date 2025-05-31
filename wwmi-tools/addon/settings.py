@@ -241,6 +241,18 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         default=True,
     ) # type: ignore
     
+    ignore_nested_collections: BoolProperty(
+        name="Ignore Nested Collections",
+        description="If enabled, objects inside nested collections inside Components collection won't be exported",
+        default=True,
+    ) # type: ignore
+
+    ignore_hidden_collections: BoolProperty(
+        name="Ignore Hidden Collections",
+        description="If enabled, objects from hidden nested collections inside Components collection won't be exported",
+        default=True,
+    ) # type: ignore
+    
     ignore_hidden_objects: BoolProperty(
         name="Ignore Hidden Objects",
         description="If enabled, hidden objects inside Components collection won't be exported",

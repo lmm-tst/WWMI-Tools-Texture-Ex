@@ -119,6 +119,8 @@ class ModExporter:
         start_time = time.time()
         object_merger = ObjectMerger(
             extracted_object=self.extracted_object,
+            ignore_nested_collections=self.cfg.ignore_nested_collections,
+            ignore_hidden_collections=self.cfg.ignore_hidden_collections,
             ignore_hidden_objects=self.cfg.ignore_hidden_objects,
             ignore_muted_shape_keys=self.cfg.ignore_muted_shape_keys,
             apply_modifiers=self.cfg.apply_all_modifiers,

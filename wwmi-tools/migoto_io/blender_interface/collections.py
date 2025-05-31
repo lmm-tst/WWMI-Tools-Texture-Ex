@@ -31,9 +31,32 @@ def assert_collection(col):
     return col
 
 
-def get_collection_objects(col):
+def collection_is_visible(col, context=None):
     col = assert_collection(col)
-    return col.objects
+
+    if context is None:
+        context = bpy.context
+
+    def search(layer_collection):
+        if layer_collection.collection == col:
+            return not layer_collection.exclude and not layer_collection.hide_viewport
+        for child in layer_collection.children:
+            result = search(child)
+            if result is not None:
+                return result
+        return None
+
+    return search(context.view_layer.layer_collection) or False
+
+
+def get_collection_objects(col, recursive=False, skip_hidden_collections=True):
+    col = assert_collection(col)
+    if recursive:
+        collections = [col] + [c for c in col.children_recursive if not skip_hidden_collections or collection_is_visible(c)]
+        objects = set(list({obj for c in collections for obj in c.objects}))
+    else:
+        objects = col.objects
+    return sorted(objects, key=lambda obj: obj.name)
 
 
 def link_collection(col, col_parent):

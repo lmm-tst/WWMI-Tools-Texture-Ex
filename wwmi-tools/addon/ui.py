@@ -114,18 +114,25 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         row.prop(cfg, 'mod_output_folder')
         
         layout.row().prop(cfg, 'mod_skeleton_type')
-                
-        layout.row()
-
-        layout.row().prop(cfg, 'mirror_mesh')
-        layout.row().prop(cfg, 'ignore_hidden_objects')
-        layout.row().prop(cfg, 'ignore_muted_shape_keys')
 
         layout.row()
         
         layout.row().prop(cfg, 'partial_export')
 
         if not cfg.partial_export:
+            layout.row()
+
+            layout.row().prop(cfg, 'mirror_mesh')
+            
+            if bpy.app.version >= (3, 5):
+                row = layout.row()
+                row.prop(cfg, 'ignore_nested_collections')
+                if not cfg.ignore_nested_collections:
+                    row.prop(cfg, 'ignore_hidden_collections')
+                
+            layout.row().prop(cfg, 'ignore_hidden_objects')
+            layout.row().prop(cfg, 'ignore_muted_shape_keys')
+
             layout.row()
             
             layout.row().prop(cfg, 'apply_all_modifiers')
@@ -252,7 +259,7 @@ class WWMI_TOOLS_PT_SidePanelIniTemplate(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         cfg = context.scene.wwmi_tools_settings
-        return cfg.tool_mode == 'EXPORT_MOD'
+        return cfg.tool_mode == 'EXPORT_MOD' and not cfg.partial_export
     
     def draw(self, context):
         layout = self.layout

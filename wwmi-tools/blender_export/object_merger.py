@@ -66,6 +66,8 @@ class ObjectMerger:
     # Input
     context: bpy.types.Context
     extracted_object: ExtractedObject
+    ignore_nested_collections: bool
+    ignore_hidden_collections: bool
     ignore_hidden_objects: bool
     ignore_muted_shape_keys: bool
     apply_modifiers: bool
@@ -106,7 +108,9 @@ class ObjectMerger:
         
         component_pattern = re.compile(r'.*component[_ -]*(\d+).*')
 
-        for obj in get_collection_objects(self.collection):
+        for obj in get_collection_objects(self.collection, 
+                                          recursive = not self.ignore_nested_collections, 
+                                          skip_hidden_collections = self.ignore_hidden_collections):
 
             if self.ignore_hidden_objects and object_is_hidden(obj):
                 continue
