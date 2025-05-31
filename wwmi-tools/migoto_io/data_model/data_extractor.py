@@ -102,8 +102,12 @@ class BlenderDataExtractor:
             elif export_semantic.abstract in semantic_converters.keys():
                 # Semantic converter specified and it works with data values
                 # Lets extract data in original format to prevent possible precision loss
-                proxy_semantic.format = blender_format
-                proxy_semantic.stride = blender_format.byte_width
+                if export_semantic.abstract.enum in [Semantic.Blendindices, Semantic.Blendweight]:
+                    proxy_semantic.stride = blender_format.byte_width * proxy_semantic.get_num_values()
+                    proxy_semantic.format = blender_format
+                else:
+                    proxy_semantic.format = blender_format
+                    proxy_semantic.stride = blender_format.byte_width
             elif export_semantic.abstract.enum not in [Semantic.Blendindices, Semantic.Blendweight]:
                 # Only blends can be directly exported with any bitness and padding, because they aren't extracted with foreach_get
                 # Other semantics may require conversion:
@@ -178,6 +182,7 @@ class BlenderDataExtractor:
                 data = self.fetch_data(mesh.uv_layers[semantic_name].data, 'uv', numpy_type, size)
             else:
                 continue
+            self.sanitize_blender_data(data)
             loop_data.set_field(semantic_name, data)
 
         # Swap every first with every third vertex for every face aka polygon
@@ -250,21 +255,20 @@ class BlenderDataExtractor:
             if semantic == Semantic.Position:
                 data = self.fetch_data(mesh.vertices, 'undeformed_co', numpy_type, size)
             elif semantic == Semantic.Blendindices:
+                dtype = numpy_type[0] if isinstance(numpy_type, tuple) else numpy_type
                 num_vgs = buffer_semantic.get_num_values()
-                data = numpy.array([[vg.group for vg in groups][:num_vgs] + [0] * (num_vgs - len(groups))
-                                    for groups in vertex_groups], dtype=numpy_type[0])
+                data = numpy.array([[vg.group for vg in groups[:num_vgs]] + [0] * (num_vgs - len(groups))
+                                    for groups in vertex_groups], dtype=dtype)
             elif semantic == Semantic.Blendweight:
+                dtype = numpy_type[0] if isinstance(numpy_type, tuple) else numpy_type
                 num_vgs = buffer_semantic.get_num_values()
-                # TODO: Try to load data into the empty numpy instead of inline padding, it may be faster
-                if buffer_semantic.format.value_byte_width > 1:
-                    data = numpy.array([[vg.weight for vg in groups][:num_vgs] + [0] * (num_vgs - len(groups))
-                                        for groups in vertex_groups], dtype=numpy_type[0])
-                else:
-                    data = numpy.array([self.normalize_8bit_weights([vg.weight for vg in groups][:num_vgs]) + [0] * (num_vgs - len(groups))
-                                        for groups in vertex_groups], dtype=numpy_type[0])
+                data = numpy.array([[vg.weight for vg in groups[:num_vgs]] + [0] * (num_vgs - len(groups))
+                                    for groups in vertex_groups], dtype=dtype)
             else:
                 continue
-
+            
+            self.sanitize_blender_data(data)
+            
             vertex_data.set_field(buffer_semantic.get_name(), data)
 
         print(f'Vertex data fetch time: {time.time() - start_time :.3f}s ({len(vertex_data.get_data())} vertices)')
@@ -295,6 +299,8 @@ class BlenderDataExtractor:
 
             data = self.fetch_data(shapekey.data, 'co', numpy_type)
 
+            self.sanitize_blender_data(data)
+
             if deduct_basis:
                 data -= base_data
 
@@ -303,6 +309,11 @@ class BlenderDataExtractor:
         print(f'Shape Keys fetch time: {time.time() - start_time :.3f}s ({len(result)} shapekeys)')
 
         return result
+
+    @staticmethod
+    def sanitize_blender_data(arr: numpy.ndarray):
+        if numpy.issubdtype(arr.dtype, numpy.floating):
+            numpy.nan_to_num(arr, copy=False)
 
     @staticmethod
     def normalize_8bit_weights(weights: List[float]) -> List[int]:
