@@ -17,7 +17,7 @@ class WWMI_TOOLS_PT_SidePanelIniToggles(bpy.types.Panel):
     @classmethod
     def poll(cls, context):
         cfg = context.scene.wwmi_tools_settings
-        return cfg.tool_mode == 'EXPORT_MOD'
+        return cfg.tool_mode == 'EXPORT_MOD' and not cfg.partial_export
     
     def draw(self, context):
         layout = self.layout
@@ -45,7 +45,7 @@ class WWMI_TOOLS_PT_SidePanelIniToggles(bpy.types.Panel):
 
             row.prop(var, "ui_expanded", icon="TRIA_DOWN" if var.ui_expanded else "TRIA_RIGHT", emboss=False, text="")
 
-            hotkeys = " ".join([f"[{binding}]" for binding in var.get_formatted_hotkeys(join_arg='+')])
+            hotkeys = " ".join([f"[{binding}]" for binding in var.get_formatted_hotkeys(join_arg='+') if binding])
 
             if var.ui_expanded:
                 split = row.split(factor=0.7)
@@ -79,10 +79,33 @@ class WWMI_TOOLS_PT_SidePanelIniToggles(bpy.types.Panel):
                     sub_box = box.box()
                     sub_row = sub_box.row()
 
+                    conditions = []
+                    state_error = False
+                    error_text = ""
+
+                    for k, obj_item in enumerate(state.objects):
+
+                        if not obj_item.object:
+                            state_error = True
+                            error_text = f"ERROR: Object {k} is not set!"
+
+                        if obj_item.has_custom_conditions(var.name, state.name):
+                            try:
+                                conditions.append('if ' + obj_item.format_conditions())
+                            except Exception as e:
+                                state_error = True
+                                conditions.append(f'ERROR: {e}')
+                        else:
+                            conditions.append('')
+
+                    sub_row.alert = state_error
+
                     if var.default_state == state.name:
                         sub_row.label(text=f"State {state.name} (default)")
                     else:
                         sub_row.label(text=f"State {state.name}")
+
+                    sub_row.alert = False
 
                     op = sub_row.operator("wwmi_tools.add_var_state_object", text="", icon="ADD")
                     op.var_index = i
@@ -105,19 +128,28 @@ class WWMI_TOOLS_PT_SidePanelIniToggles(bpy.types.Panel):
                     op.var_index = i
                     op.state_index = j
 
+                    if error_text:
+                        sub_box.alert = state_error
+                        sub_box.row().label(text=error_text)
+                        sub_box.alert = False
+
                     for k, obj_item in enumerate(state.objects):
                         obj_row = sub_box.row()
 
-                        if len(obj_item.conditions) > 0:
-                            condition = obj_item.conditions[0]
-                            is_custom_condition = condition.var != var.name or condition.state != state.name or condition.operator != '=='
-                            if not cfg.ini_toggles.hide_default_conditions or is_custom_condition:
-                                obj_row.label(text='if ' + obj_item.format_conditions())
-                                obj_row = sub_box.row()
+                        obj_conditions = conditions[k]
+                        condition_error = obj_conditions.startswith('ERR')
+                        if obj_conditions:
+                            obj_row.alert = condition_error
+                            obj_row.label(text=obj_conditions)
+                            obj_row.alert = False
+
+                        obj_row = sub_box.row()
 
                         obj_row.prop(obj_item, "object", text="")
-                                            
+
+                        obj_row.alert = condition_error      
                         op = obj_row.operator("wwmi_tools.edit_var_state_object", text="", icon="PREFERENCES")
+                        obj_row.alert = False      
                         op.var_index = i
                         op.state_index = j
                         op.object_index = k
@@ -387,7 +419,9 @@ class WWMI_TOOLS_OT_EditVarStateObject(bpy.types.Operator):
                 if cond_group is not None:
                     split.prop_search(condition, "state", cond_group, "states", text="")
                 else:
-                    split.label(text="N/A")
+                    split.alert = True
+                    split.label(text="< Select Var! >")
+                    split.alert = False
             else:
                 split.prop(condition, "state", text="")
 

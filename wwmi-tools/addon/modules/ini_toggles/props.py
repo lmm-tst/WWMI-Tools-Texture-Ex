@@ -46,6 +46,10 @@ class ToggleVarStateCondition(bpy.types.PropertyGroup):
 
     def __str__(self):
         var_name = self.var.strip()
+        if not var_name:
+            raise ValueError(f'Var name is not set')
+        if not self.state:
+            raise ValueError(f'State is not set')
         if self.type == 'EXTERNAL' and var_name.startswith('$'):
             pass  # Use var name as it is, without any formatting
         else:
@@ -87,8 +91,16 @@ class ToggleVarStateObject(bpy.types.PropertyGroup):
         for i, condition in enumerate(self.conditions):
             if i != 0:
                 result += ' ' + condition.logic + ' '
-            result += str(condition)
+            try:
+                result += str(condition)
+            except Exception as e:
+                raise ValueError(f'Condition {i}: {e}') from e
         return result
+    
+    def has_custom_conditions(self, var_name, var_state):
+        for condition in self.conditions:
+            if condition.var != var_name or condition.state != var_state or condition.operator != '==':
+                return True
 
 
 class ToggleVarState(bpy.types.PropertyGroup):
@@ -108,8 +120,7 @@ class ToggleVarState(bpy.types.PropertyGroup):
         state_object = self.objects[-1]
         state_object.add_default_condition(var_name, self.name)
         return state_object
-
-
+    
 
 class ToggleVar(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(
@@ -355,9 +366,14 @@ class IniToggles(bpy.types.PropertyGroup):
         conditions = {}
         for var in self.vars:
             for state in var.states:
-                for obj in state.objects:
-                    if obj.object.name in conditions.keys():
-                        conditions[obj.object.name] += f' || ({obj.format_conditions()})'
-                    else:
-                        conditions[obj.object.name] = f'({obj.format_conditions()})'
+                for obj_id, obj in enumerate(state.objects):
+                    try:
+                        if not obj.object:
+                            raise ValueError(f'Object {obj_id} is not set')
+                        if obj.object.name in conditions.keys():
+                            conditions[obj.object.name] += f' || ({obj.format_conditions()})'
+                        else:
+                            conditions[obj.object.name] = f'({obj.format_conditions()})'
+                    except Exception as e:
+                        raise ValueError(f'Ini Toggles error in State `{state.name}` of Var `{var.name}`:\n{e}') from e
         return conditions
