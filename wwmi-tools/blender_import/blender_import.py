@@ -60,12 +60,10 @@ class ObjectImporter:
         col = new_collection(object_source_folder.stem)
         for obj in imported_objects:
             link_object_to_collection(obj, col)
-            with OpenObject(context, obj, 'OBJECT'):
-                obj.scale = 0.01, 0.01, 0.01
 
         print(f'Total import time: {time.time() - start_time :.3f}s')
 
-    def import_component(self, operator, context, cfg, fmt_path: Path, ib_path: Path, vb_path: Path, axis_forward='-Y', axis_up='Z'):
+    def import_component(self, operator, context, cfg, fmt_path: Path, ib_path: Path, vb_path: Path, axis_forward='Y', axis_up='Z'):
 
         start_time = time.time()
 
@@ -104,7 +102,7 @@ class ObjectImporter:
             model.flip_winding = True
             model.flip_texcoord_v = True
 
-            model.set_data(obj, mesh, index_buffer, vertex_buffer, vg_remap, mirror_mesh=cfg.mirror_mesh)
+            model.set_data(obj, mesh, index_buffer, vertex_buffer, vg_remap, mirror_mesh=cfg.mirror_mesh, mesh_scale=0.01, mesh_rotation=(0, 0, 180))
 
             num_shapekeys = 0 if obj.data.shape_keys is None else len(getattr(obj.data.shape_keys, 'key_blocks', []))
 
