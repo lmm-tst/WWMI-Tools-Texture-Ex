@@ -73,6 +73,8 @@ class ObjectMerger:
     apply_modifiers: bool
     collection: str
     skeleton_type: SkeletonType
+    mesh_scale: float = 1.0
+    mesh_rotation: Tuple[float] = (0.0, 0.0, 0.0)
     # Output
     merged_object: MergedObject = field(init=False)
 
@@ -157,13 +159,16 @@ class ObjectMerger:
                             muted_shape_keys.append(shape_key)
                     for shape_key in muted_shape_keys:
                         temp_obj.shape_key_remove(shape_key)
-                # Apply all modifiers to temporary object
-                if self.apply_modifiers:
-                    with OpenObject(self.context, temp_obj) as obj:
+                # Modify temporary object
+                with OpenObject(self.context, temp_obj, mode='OBJECT') as obj:
+                    # Apply all transforms
+                    bpy.ops.object.transform_apply(location = True, rotation = True, scale = True)
+                    # Apply all modifiers
+                    if self.apply_modifiers:
                         selected_modifiers = [modifier.name for modifier in get_modifiers(obj)]
                         apply_modifiers_for_object_with_shape_keys(self.context, selected_modifiers, None)
-                # Triangulate temporary object, this step is crucial as export supports only triangles
-                triangulate_object(self.context, temp_obj)
+                    # Triangulate (this step is crucial since export supports only triangles)
+                    triangulate_object(self.context, temp_obj)
                 # Handle Vertex Groups
                 vertex_groups = get_vertex_groups(temp_obj)
                 # Remove ignored or unexpected vertex groups
@@ -197,6 +202,25 @@ class ObjectMerger:
             for temp_object in component.objects:
                 remove_mesh(temp_object.object.data)
 
+    def transform_merged_object(self, merged_object):
+        change_scale = self.mesh_scale != 1.0
+        change_rotation = self.mesh_rotation != (0.0, 0.0, 0.0)
+        if not change_scale and not change_rotation:
+            return
+        # Compensate transforms we're about to set
+        if change_scale:
+            inverted_scale = 1 / self.mesh_scale
+            merged_object.scale = inverted_scale, inverted_scale, inverted_scale
+        if change_rotation:
+            inverted_rotation = tuple([360 - r if r != 0 and r != 0 else 0 for r in self.mesh_rotation])
+            merged_object.rotation_euler = to_radians(inverted_rotation)
+        bpy.ops.object.transform_apply(location = False, rotation = True, scale = True)
+        # Set merged object transforms
+        if change_scale:
+            merged_object.scale = self.mesh_scale, self.mesh_scale, self.mesh_scale
+        if change_rotation:
+            merged_object.rotation_euler = to_radians(self.mesh_rotation)
+
     def build_merged_object(self):
 
         merged_object = []
@@ -216,6 +240,8 @@ class ObjectMerger:
         deselect_all_objects()
         select_object(obj)
         set_active_object(bpy.context, obj)
+        
+        self.transform_merged_object(obj)
 
         mesh = obj.evaluated_get(self.context.evaluated_depsgraph_get()).to_mesh()
 

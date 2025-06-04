@@ -1,8 +1,12 @@
+import numpy
+
 from dataclasses import dataclass
+from typing import Tuple
 
 import bpy
 import bmesh
 
+from .utility import get_scale_matrix, get_rotation_matrix, to_radians
 from .collections import assert_collection, unhide_collection
 from .mesh import remove_mesh
 
@@ -261,3 +265,130 @@ def join_objects(context, objects):
             bpy.ops.object.join()
     for mesh in unused_meshes:
         remove_mesh(mesh)
+
+        
+def set_rotation(context, obj, rotation: Tuple[float], apply_to_mesh = False, keep_orientation = False):
+    """
+    Warning! This function runs 10x slower than built-in one for objects with shapekeys
+    """
+
+    new_rotation = to_radians(rotation)
+    current_rotation = tuple(obj.rotation_euler)
+
+    # Exit if current transform matches specified rotation
+    if current_rotation == new_rotation:
+        return
+    
+    with OpenObject(context, obj, mode='OBJECT') as obj:
+        # Calculate rotation matrix
+        if keep_orientation:
+            # Preserve current visual orientation
+            current_matrix = obj.rotation_euler.to_matrix().to_4x4()
+            # Invert new rotation matrix to compensate obj.rotation_euler if we're not applying rotation to mesh
+            new_matrix = get_rotation_matrix(new_rotation, invert=not apply_to_mesh)
+            rotation_matrix = current_matrix @ new_matrix
+        elif current_rotation != (0.0, 0.0, 0.0):
+            # Modify existing rotation
+            current_matrix = obj.rotation_euler.to_matrix().to_4x4()
+            if apply_to_mesh:
+                # Apply modified rotation to mesh
+                new_matrix = get_rotation_matrix(new_rotation)
+                rotation_matrix = current_matrix @ new_matrix
+            else:
+                # Apply existing rotation to mesh
+                rotation_matrix = current_matrix
+        else:
+            # Just use new rotation
+            if apply_to_mesh:
+                # Apply new rotation to mesh
+                new_matrix = get_rotation_matrix(new_rotation)
+                rotation_matrix = new_matrix
+            else:
+                # Do not modify mesh
+                rotation_matrix = None
+        
+        # Apply rotation matrix to mesh
+        if rotation_matrix is not None:
+            
+            obj.data.transform(rotation_matrix)
+
+            if obj.data.shape_keys is not None and len(getattr(obj.data.shape_keys, 'key_blocks', [])) > 0:
+                shape_keys = obj.data.shape_keys.key_blocks
+                rotation_matrix = numpy.array(rotation_matrix.to_3x3(), dtype=numpy.float32)
+                for key in shape_keys:
+                    n = len(key.data)
+                    coords = numpy.empty(n * 3, dtype=numpy.float32)
+                    key.data.foreach_get("co", coords)
+                    coords = coords.reshape((n, 3))
+                    coords = coords @ rotation_matrix.T
+                    key.data.foreach_set("co", coords.ravel())
+                obj.data.update()
+
+        # Set object's Transform Rotation
+        if apply_to_mesh:
+            obj.rotation_euler = (0.0, 0.0, 0.0)
+        else:
+            obj.rotation_euler = new_rotation
+
+
+def set_scale(context, obj, new_scale: Tuple[float], apply_to_mesh = False, keep_size = False):
+    """
+    Warning! This function runs 10x slower than built-in one for objects with shapekeys
+    """
+
+    current_scale = tuple(obj.scale)
+
+    # Exit if current transform matches specified scale
+    if current_scale == new_scale:
+        return
+    
+    with OpenObject(context, obj, mode='OBJECT') as obj:
+        # Calculate scale matrix
+        if keep_size:
+            # Preserve current visual size
+            current_matrix = get_scale_matrix(current_scale)
+            # Invert new scale matrix to compensate obj.scale if we're not applying scale to mesh
+            new_matrix = get_scale_matrix(new_scale, invert=not apply_to_mesh)
+            scale_matrix = current_matrix @ new_matrix
+        elif current_scale != (1.0, 1.0, 1.0):
+            # Modify existing scale
+            current_matrix = get_scale_matrix(current_scale)
+            if apply_to_mesh:
+                # Apply modified scale to mesh
+                new_matrix = get_scale_matrix(new_scale)
+                scale_matrix = current_matrix @ new_matrix
+            else:
+                # Apply existing scale to mesh
+                scale_matrix = current_matrix
+        else:
+            # Just use new scale
+            if apply_to_mesh:
+                # Apply new scale to mesh
+                new_matrix = get_scale_matrix(new_scale)
+                scale_matrix = new_matrix
+            else:
+                # Do not modify mesh
+                scale_matrix = None
+
+        # Apply scale matrix to mesh
+        if scale_matrix is not None:
+
+            obj.data.transform(scale_matrix)
+
+            if obj.data.shape_keys is not None and len(getattr(obj.data.shape_keys, 'key_blocks', [])) > 0:
+                shape_keys = obj.data.shape_keys.key_blocks
+                scale_matrix = numpy.array(scale_matrix.to_3x3(), dtype=numpy.float32)
+                for key in shape_keys:
+                    n = len(key.data)
+                    coords = numpy.empty(n * 3, dtype=numpy.float32)
+                    key.data.foreach_get("co", coords)
+                    coords = coords.reshape((n, 3))
+                    coords = coords @ scale_matrix.T
+                    key.data.foreach_set("co", coords.ravel())
+                obj.data.update()
+
+        # Set object's Transform Scale
+        if apply_to_mesh:
+            obj.scale = (1.0, 1.0, 1.0)
+        else:
+            obj.scale = new_scale
