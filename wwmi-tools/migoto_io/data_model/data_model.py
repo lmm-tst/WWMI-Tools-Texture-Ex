@@ -2,6 +2,9 @@ import time
 import json
 import numpy
 import copy
+import math
+import mathutils
+
 import bpy
 
 from typing import Tuple, List, Dict, Optional, Union
@@ -44,7 +47,9 @@ class DataModel:
                  index_buffer: NumpyBuffer,
                  vertex_buffer: NumpyBuffer,
                  vg_remap: Optional[numpy.ndarray],
-                 mirror_mesh: bool = False):
+                 mirror_mesh: bool = False,
+                 mesh_scale: float = 1.0,
+                 mesh_rotation: Tuple[float] = (0.0, 0.0, 0.0)):
 
         # Copy default converters
         semantic_converters, format_converters = {}, {}
@@ -62,9 +67,19 @@ class DataModel:
             # Skip tangents import, we'll recalc them on export
             if semantic.abstract.enum in [Semantic.Tangent, Semantic.BitangentSign]:
                 continue
-            # Invert X coord of every vector in arrays required to mirror mesh
-            if mirror_mesh and semantic.abstract.enum in [Semantic.Position, Semantic.ShapeKey, Semantic.Normal]:
-                self._insert_converter(semantic_converters, semantic.abstract, self.converter_mirror_vector)
+            # Modify coordinate (vector-based) semantics
+            if semantic.abstract.enum in [Semantic.Position, Semantic.ShapeKey, Semantic.Normal]:
+                # Invert X coord of every vector in arrays required to mirror mesh
+                if mirror_mesh:
+                    self._insert_converter(semantic_converters, semantic.abstract, self.converter_mirror_vector)
+                # Scale coords of every vector in arrays required to scale mesh
+                if mesh_scale != 1.0:
+                    converter = lambda data: self.converter_scale_vector(data, mesh_scale)
+                    self._insert_converter(semantic_converters, semantic.abstract, converter)
+                # Rotate coords of every vector in arrays required to rotate mesh
+                if mesh_rotation != (0.0, 0.0, 0.0):
+                    converter = lambda data: self.converter_rotate_vector(data, mesh_rotation)
+                    self._insert_converter(semantic_converters, semantic.abstract, converter)
             # Flip V component of UV maps
             if self.flip_texcoord_v and semantic.abstract.enum == Semantic.TexCoord:
                 self._insert_converter(semantic_converters, semantic.abstract, self.converter_flip_texcoord_v)
@@ -254,6 +269,18 @@ class DataModel:
     @staticmethod
     def converter_mirror_vector(data: numpy.ndarray) -> numpy.ndarray:
         data[:, 0] *= -1
+        return data
+    
+    @staticmethod
+    def converter_rotate_vector(data: numpy.ndarray, rotation: Tuple[float]) -> numpy.ndarray:
+        rotation_matrix = mathutils.Euler(tuple(map(math.radians, rotation)), 'XYZ').to_matrix().to_4x4()
+        rotation_matrix_array = numpy.array(rotation_matrix)[:3, :3]
+        data = data @ rotation_matrix_array.T
+        return data
+        
+    @staticmethod
+    def converter_scale_vector(data: numpy.ndarray, scale: float) -> numpy.ndarray:
+        data *= scale
         return data
     
     @staticmethod
