@@ -42,10 +42,6 @@ class BlenderDataImporter:
             # Get converted data from vertex buffer
             data = self.get_semantic_data(vertex_buffer, buffer_semantic, format_converters, semantic_converters)
 
-            # Any remaining normalized integers must be converted to floats before import
-            if buffer_semantic.format.dxgi_type in [DXGIType.UNORM16, DXGIType.UNORM8, DXGIType.SNORM16, DXGIType.SNORM8]:
-                data = buffer_semantic.format.type_decoder(data)
-
             if semantic == Semantic.ShapeKey:
                 shapekeys[buffer_semantic.abstract.index] = data
             elif semantic == Semantic.Color:
@@ -88,6 +84,11 @@ class BlenderDataImporter:
                 if not data.flags.writeable:
                     data = converter(data.copy())
 
+        # Any remaining normalized integers must be converted to floats before running semantic converters
+        if buffer_semantic.format.dxgi_type in [DXGIType.UNORM16, DXGIType.UNORM8, DXGIType.SNORM16, DXGIType.SNORM8]:
+            if not numpy.issubdtype(data.dtype, numpy.floating):
+                data = buffer_semantic.format.type_decoder(data)
+            
         for converter in semantic_converters.get(buffer_semantic.abstract, []):
             try:
                 data = converter(data)
