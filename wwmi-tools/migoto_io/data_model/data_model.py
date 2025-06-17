@@ -398,48 +398,50 @@ class DataModel:
         # Make array of weights with stripped float part
         normalized_weights_integer = numpy.floor(normalized_weights)
 
-        # Step 3: Calculate precision loss factor
-
-        # Make array of weights with stripped integer part
-        normalized_weights_float = normalized_weights - normalized_weights_integer
-        # Calculate how significant for each VG would be to lose its float part
-        # For example, losing 0.250 for 25.250 is 2 times more significant than losing 0.500 for 100.500 (0.010 vs 0.005)
-        with numpy.errstate(divide='ignore', invalid='ignore'):
-            precision_loss_factor = normalized_weights_float / normalized_weights_integer
-        # Replace infinities or NaNs resulted from divizion by zero with 0.0
-        precision_loss_factor = numpy.nan_to_num(precision_loss_factor, nan=0.0, posinf=0.0, neginf=0.0)
-
-        # Step 4: Calculate precision error
+        # Step 3: Calculate precision error
 
         # Calculate error resulted from float part truncation
         precision_error = 255 - normalized_weights_integer.sum(axis=1)
 
-        # Step 5: Distribute precision error to weights with highest precision loss factor
+        if max(precision_error) > 0:
+            
+            # Step 4: Calculate precision loss factor
 
-        # Get index of non-zero precision errors
-        non_zero_error_idx = numpy.where(precision_error > 0)[0]
-        # Calculate maximum precision error
-        max_precision_error = int(max(precision_error[non_zero_error_idx]))
-        # Raise exception if maximum precision error exceeds 2-nd dimension size, since truncation cannat cause loss higher than 1 per weight value
-        if max_precision_error > normalized_weights_integer.shape[1]:
-            raise ValueError(f'8-bit weights normalization failed (max precision error {max_precision_error} exceeds VG count {normalized_weights_integer.shape[1]})')
+            # Make array of weights with stripped integer part
+            normalized_weights_float = normalized_weights - normalized_weights_integer
+            # Calculate how significant for each VG would be to lose its float part
+            # For example, losing 0.250 for 25.250 is 2 times more significant than losing 0.500 for 100.500 (0.010 vs 0.005)
+            with numpy.errstate(divide='ignore', invalid='ignore'):
+                precision_loss_factor = normalized_weights_float / normalized_weights_integer
+            # Replace infinities or NaNs resulted from divizion by zero with 0.0
+            precision_loss_factor = numpy.nan_to_num(precision_loss_factor, nan=0.0, posinf=0.0, neginf=0.0)
 
-        if len(non_zero_error_idx) > 0:
-            # Make first dimension index where precision error is above zero
-            target_idx = numpy.arange(normalized_weights_integer.shape[0])[non_zero_error_idx][:, None]
-            # Get per-vertex index of descending-sorted precision loss factor
-            # So precision loss factor [[0.2, 0.4, 0,3, 0.1], [0.3, 0.0, 0,5, 0.1]] will result in [[1, 2, 0, 3], [2, 0, 3, 1]]
-            loss_factor_dsc_idx = numpy.argsort(precision_loss_factor[non_zero_error_idx], axis=1)[:, -max_precision_error:][:, ::-1] 
-            # Convert precision error to 2-dim array used to distribute error to integer weights
-            # So precision_error of [2, 1, 3] will result in [[1, 1, 0], [1, 0, 0], [1, 1, 1]]
-            distributed_precision_error = numpy.arange(max_precision_error) < precision_error[non_zero_error_idx][:, None]
-            distributed_precision_error = distributed_precision_error.astype(int)
-            # Add ones from distributed_precision_error to normalized_weights_integer according to loss_factor_dsc_idx 
-            # So, for each vertex with non-zero error:
-            # [[3, 2, 1]] - loss_factor_dsc_idx
-            # [[1, 1, 0]] - distributed_precision_error
-            # [[119, 35, 47, 52]] (253 total) - normalized_weights_integer[target_idx]
-            # [[119, 35, 48, 53]] (255 total) - result
-            numpy.add.at(normalized_weights_integer, (target_idx, loss_factor_dsc_idx), distributed_precision_error)
+            # Step 5: Distribute precision error to weights with highest precision loss factor
+
+            # Get index of non-zero precision errors
+            non_zero_error_idx = numpy.where(precision_error > 0)[0]
+            # Calculate maximum precision error
+            max_precision_error = int(max(precision_error[non_zero_error_idx]))
+            # Raise exception if maximum precision error exceeds 2-nd dimension size, since truncation cannat cause loss higher than 1 per weight value
+            if max_precision_error > normalized_weights_integer.shape[1]:
+                raise ValueError(f'8-bit weights normalization failed (max precision error {max_precision_error} exceeds VG count {normalized_weights_integer.shape[1]})')
+
+            if len(non_zero_error_idx) > 0:
+                # Make first dimension index where precision error is above zero
+                target_idx = numpy.arange(normalized_weights_integer.shape[0])[non_zero_error_idx][:, None]
+                # Get per-vertex index of descending-sorted precision loss factor
+                # So precision loss factor [[0.2, 0.4, 0,3, 0.1], [0.3, 0.0, 0,5, 0.1]] will result in [[1, 2, 0, 3], [2, 0, 3, 1]]
+                loss_factor_dsc_idx = numpy.argsort(precision_loss_factor[non_zero_error_idx], axis=1)[:, -max_precision_error:][:, ::-1] 
+                # Convert precision error to 2-dim array used to distribute error to integer weights
+                # So precision_error of [2, 1, 3] will result in [[1, 1, 0], [1, 0, 0], [1, 1, 1]]
+                distributed_precision_error = numpy.arange(max_precision_error) < precision_error[non_zero_error_idx][:, None]
+                distributed_precision_error = distributed_precision_error.astype(int)
+                # Add ones from distributed_precision_error to normalized_weights_integer according to loss_factor_dsc_idx 
+                # So, for each vertex with non-zero error:
+                # [[3, 2, 1]] - loss_factor_dsc_idx
+                # [[1, 1, 0]] - distributed_precision_error
+                # [[119, 35, 47, 52]] (253 total) - normalized_weights_integer[target_idx]
+                # [[119, 35, 48, 53]] (255 total) - result
+                numpy.add.at(normalized_weights_integer, (target_idx, loss_factor_dsc_idx), distributed_precision_error)
 
         return normalized_weights_integer.astype(numpy.uint8)
