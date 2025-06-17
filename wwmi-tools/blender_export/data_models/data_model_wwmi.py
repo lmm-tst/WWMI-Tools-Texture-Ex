@@ -82,9 +82,12 @@ class DataModelWWMI(DataModel):
 
         build_blend_remaps = object_index_layout is not None and 'Blend' not in excluded_buffers
 
+        # Request 16-bit VG ids for Blend Remap system
         if build_blend_remaps:
+            # Number of VGs per vertex may vary based on buffers_format, we should respect it
+            num_vgs = buffers_format['Blend'].get_element(AbstractSemantic(Semantic.Blendindices, 0)).get_num_values()
             buffers_format['BlendRemapVertexVG'] = BufferLayout([
-                BufferSemantic(AbstractSemantic(Semantic.Blendindices, 1), DXGIFormat.R16_UINT, stride=8),
+                BufferSemantic(AbstractSemantic(Semantic.Blendindices, 1), DXGIFormat.R16_UINT, stride=num_vgs*2),
             ])
 
         index_data, vertex_buffer = self.export_data(context, collection, mesh, excluded_buffers, buffers_format, mirror_mesh, build_blend_remaps)
@@ -212,17 +215,23 @@ class DataModelWWMI(DataModel):
 
         index_offset = 0
         for index_count in index_layout:
+            # Extract a segment of Index Buffer for the component (index_count number of indices starting from index_offset)
             vertex_ids = index_data[index_offset:index_offset+index_count]
+            # Remove duplicate vertex ids (since multiple indices may reference the same vertex)
             vertex_ids = numpy.unique(vertex_ids)
 
+            # Get VG ids used to weight vertices used in the component
             obj_vg_ids = vg_ids[vertex_ids].flatten()
             
+            # Skip remapping the component if it references VG ids below 256 only
             if numpy.max(obj_vg_ids) < 256:
                 index_offset += index_count
                 remapped_vgs_counts.append(0)
                 continue
 
+            # Get weights for vertices referenced by the component
             obj_vg_weights = vg_weights[vertex_ids].flatten()
+            # Get indices of non-zero weights (to skip remapping VG ids that are listed but not actually used)
             non_zero_idx = numpy.nonzero(obj_vg_weights > 0)[0]
 
             obj_vg_ids = obj_vg_ids[non_zero_idx]
@@ -239,7 +248,6 @@ class DataModelWWMI(DataModel):
             forward[numpy.arange(len(obj_vg_ids))] = obj_vg_ids
 
             reverse = numpy.zeros(512, dtype=numpy.uint16)
-
             reverse[obj_vg_ids] = numpy.arange(len(obj_vg_ids))
 
             blend_remap_forward = numpy.concatenate((blend_remap_forward, forward), axis=0)
