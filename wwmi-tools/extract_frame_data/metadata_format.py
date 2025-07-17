@@ -107,5 +107,7 @@ def from_dict(cls, data):
 
 
 def read_metadata(metadata_path: Path) -> ExtractedObject:
+    if not metadata_path.is_file():
+        return None
     with open(metadata_path) as f:
         return from_dict(ExtractedObject, json.load(f))
