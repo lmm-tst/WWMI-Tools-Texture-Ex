@@ -8,6 +8,7 @@ from ...exceptions import clear_error, ConfigError
 from ....migoto_io.blender_tools.vertex_groups import *
 from ....migoto_io.blender_tools.modifiers import *
 from ....migoto_io.blender_tools.meshes import *
+from ....migoto_io.blender_tools.textures import *
 
 
 class WWMI_MergeVertexGroups(bpy.types.Operator):
@@ -190,4 +191,42 @@ class WWMI_ApplyMergedObjectSculpt(bpy.types.Operator):
             self.report({'ERROR'}, str(e))
             
         return {'FINISHED'}
+
+
+#////////////////////////////////////////////
+#MOMO ADD: Texture Quick Import
+#////////////////////////////////////////////
+class WWMI_TextureQuickImport(bpy.types.Operator):
+    bl_idname = "wwmi_tools.texture_quick_import"
+    bl_label = "Texture Quick Import"
+    bl_description = "Quickly import texture files into the current blend file."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        try:
+            transfer_position_data(context)
+            
+        except ValueError as e:
+            self.report({'ERROR'}, str(e))
+            
+        return {'FINISHED'}
+    
+class WWMI_GenerateTGAFromDDS(bpy.types.Operator):
+    bl_idname = "wwmi_tools.generate_tga_from_dds"
+    bl_label = "Generate TGA From DDS"
+    bl_description = "Generates TGA file from DDS file."
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        try:
+            cfg = context.scene.wwmi_tools_settings
+            clear_error(cfg)
+            generate_tga_texture(cfg)
+            
+        except ConfigError as e:
+            self.report({'ERROR'}, str(e))
+            
+        return {'FINISHED'}
+    
+
     

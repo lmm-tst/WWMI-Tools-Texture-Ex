@@ -97,7 +97,7 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
         layout.row().operator(WWMI_RemoveAllVertexGroups.bl_idname)
         layout.row().operator(WWMI_CreateMergedObject.bl_idname)
         layout.row().operator(WWMI_ApplyMergedObjectSculpt.bl_idname)
-
+        
     def draw_menu_export_mod(self, context):
         cfg = context.scene.wwmi_tools_settings
         layout = self.layout
@@ -160,10 +160,15 @@ class WWMI_TOOLS_PT_SIDEBAR(bpy.types.Panel):
 
         layout.row().prop(cfg, 'import_skeleton_type')
         layout.row().prop(cfg, 'mirror_mesh')
-
+        
         layout.row()
 
         layout.row().operator(WWMI_Import.bl_idname)
+
+        layout.row()
+        layout.row().label(text="Texture Tools:")
+        layout.row().operator(WWMI_GenerateTGAFromDDS.bl_idname)
+        layout.row().operator(WWMI_TextureQuickImport.bl_idname)
 
     def draw_menu_extract_frame_data(self, context):
         cfg = context.scene.wwmi_tools_settings
