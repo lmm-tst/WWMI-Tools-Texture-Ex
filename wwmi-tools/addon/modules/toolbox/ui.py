@@ -204,7 +204,13 @@ class WWMI_TextureQuickImport(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            transfer_position_data(context)
+            cfg = context.scene.wwmi_tools_settings
+            clear_error(cfg)
+            used_textures = set()
+            for obj in get_selected_objects(context):
+                print(f"obj:{obj}")
+                print(f"obj.type:{obj.type}")
+                import_texture(context, obj, cfg, used_textures)
             
         except ValueError as e:
             self.report({'ERROR'}, str(e))
