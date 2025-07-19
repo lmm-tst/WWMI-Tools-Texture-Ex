@@ -1,7 +1,32 @@
+<h1 align="center">WWMI Tools 贴图功能扩展 (Texture Feature Extension)</h1>
+
+<h4 align="center">新增贴图转换与一键导入功能</h4>
+
+
+
+## 使用的相关项目 (Projects Utilized)
+
+使用了以下项目中的工具或组件：
+- **WWMI-Tools**  
+  [https://github.com/SpectrumQT/WWMI-Tools](https://github.com/SpectrumQT/WWMI-Tools)
+
+- **Blender-DDS-Addon**  
+  [https://github.com/matyalatte/Blender-DDS-Addon](https://github.com/matyalatte/Blender-DDS-Addon)
+
+- **Texconv-Custom-DLL**  
+  [https://github.com/matyalatte/Texconv-Custom-DLL](https://github.com/matyalatte/Texconv-Custom-DLL)
+
+## 功能简介
+
+- 支持一键导入DDS贴图
+- 支持一键为DDS生成TGA副本
+- 物体和贴图可以分部分，不同文件夹导入  
+
+  
+    
 <h1 align="center">WWMI Tools</h1>
 
 <h4 align="center">Blender addon for Wuthering Waves Model Importer</h4>
-
 <p align="center">
   <a href="#features">Features</a> •
   <a href="#how-to-use">How To Use</a> • 
