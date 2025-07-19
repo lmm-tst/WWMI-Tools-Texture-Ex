@@ -23,9 +23,9 @@ def convert_dds_to_tga(dds_path,tga_folder):
 
 def generate_tga_texture(cfg):
     folder_path = resolve_path(cfg.object_source_folder)
-    #print(f"test:{folder_path}")
-    REMOVEPATH = r"F:\blenderforld"
-    if not folder_path.is_dir() or os.path.samefile(folder_path, REMOVEPATH):
+    print(f"test 0001:{folder_path}")
+    REMOVEPATH = "blenderforld"
+    if not folder_path.is_dir() or REMOVEPATH in folder_path.name.lower():
         raise ConfigError('object_source_folder', "Specified sources folder does not exist!")
     else:
         for filename in os.listdir(folder_path):
@@ -55,8 +55,8 @@ def import_texture(context, obj, cfg, used_textures):
     
     folder_path = resolve_path(cfg.object_source_folder)
     #print(f"test:{folder_path}")
-    REMOVEPATH = r"F:\blenderforld"
-    if not folder_path.is_dir() or os.path.samefile(folder_path, REMOVEPATH):
+    REMOVEPATH = "blenderforld"
+    if not folder_path.is_dir() or REMOVEPATH in folder_path.name.lower():
         raise ConfigError('object_source_folder', "Specified sources folder does not exist!")
     
     tga_folder_path = os.path.join(folder_path, "tga")
@@ -86,26 +86,34 @@ def import_texture(context, obj, cfg, used_textures):
         if texture_path is None:
             raise ValueError(f"No matching texture found for object {obj.name} in folder {tga_folder_path}")
         # 加载贴图文件
+        # 创建贴图节点
+        texture_node = mat_nodes.new(type='ShaderNodeTexImage')
         texture_node.image = bpy.data.images.load(texture_path)
         texture_node.image.colorspace_settings.name = 'Filmic sRGB'
         texture_node.location = (-400, 0)
 
-        # 创建一个 Principled BSDF 节点
+        # 创建 Principled BSDF 节点
         principled_bsdf = mat_nodes.new(type='ShaderNodeBsdfPrincipled')
         principled_bsdf.location = (0, 0)
 
-        # 创建一个输出节点
+        # 创建输出节点
         output_node = mat_nodes.new(type='ShaderNodeOutputMaterial')
         output_node.location = (400, 0)
 
-        # 连接贴图节点的颜色输出到 Principled BSDF 的 Base Color 输入
+        # Base Color ← Texture Color
         mat.node_tree.links.new(principled_bsdf.inputs['Base Color'], texture_node.outputs['Color'])
 
-        # 连接贴图节点的alpha输出到 Principled BSDF 的次表面 (Subsurface) 输入
         mat.node_tree.links.new(principled_bsdf.inputs['Emission Strength'], texture_node.outputs['Alpha'])
 
-        # 将 Principled BSDF 的输出连接到输出节点
-        mat.node_tree.links.new(output_node.inputs['Surface'], principled_bsdf.outputs['BSDF'])
+        # 设置 Emission 为黑色（如果存在）
+        if 'Emission' in principled_bsdf.inputs:
+            principled_bsdf.inputs['Emission'].default_value = (0.0, 0.0, 0.0, 1.0)
+            mat.node_tree.links.new(output_node.inputs['Surface'], principled_bsdf.outputs['BSDF'])
+        else:
+            # 在 Blender 4.2+ 中没有 Emission，需要添加 Emission 节点并用 Add Shader 混合
+            principled_bsdf.inputs['Emission Color'].default_value = (0.0, 0.0, 0.0, 1.0)
+            mat.node_tree.links.new(output_node.inputs['Surface'], principled_bsdf.outputs['BSDF'])
+
 
 
 def assign_textures_to_objects(obj, folder_path, used_textures):
