@@ -4,9 +4,9 @@
 
 
 
-## 使用的相关项目 (Projects Utilized)
+## 相关项目 
 
-使用了以下项目中的工具或组件：
+以下项目中的工具或组件：
 - **WWMI-Tools**  
   [https://github.com/SpectrumQT/WWMI-Tools](https://github.com/SpectrumQT/WWMI-Tools)
 
