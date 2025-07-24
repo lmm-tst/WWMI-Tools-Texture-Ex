@@ -67,6 +67,12 @@ class WWMI_Settings(bpy.types.PropertyGroup):
         update=lambda self, context: self.on_update_clear_error('frame_dump_folder'),
     ) # type: ignore
 
+    allow_missing_shapekeys: BoolProperty(
+        name="Extract Objects With Missing Shapekeys",
+        description="Do not skip extraction of objects with missing shapekeys data (normally user should re-dump during some facial animation).",
+        default=False,
+    ) # type: ignore
+
     skip_small_textures: BoolProperty(
         name="Textures Filtering: Skip Small",
         description="Skip texture smaller than specified size",
