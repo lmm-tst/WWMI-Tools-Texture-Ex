@@ -206,7 +206,7 @@ class WWMI_TextureQuickImport(bpy.types.Operator):
         try:
             cfg = context.scene.wwmi_tools_settings
             clear_error(cfg)
-            used_textures = set()
+            used_textures = {}
             for obj in get_selected_objects(context):
                 print(f"obj:{obj}")
                 print(f"obj.type:{obj.type}")

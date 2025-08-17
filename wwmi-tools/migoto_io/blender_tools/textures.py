@@ -81,16 +81,22 @@ def import_texture(context, obj, cfg, used_textures):
 
         # 创建一个新的贴图节点
         texture_node = mat_nodes.new(type='ShaderNodeTexImage')
-        texture_path = assign_textures_to_objects(obj, tga_folder_path,used_textures)
+        texture_match = assign_textures_to_objects(obj, tga_folder_path,used_textures)
         
-        if texture_path is None:
+        if texture_match is None:
             raise ValueError(f"No matching texture found for object {obj.name} in folder {tga_folder_path}")
         # 加载贴图文件
         # 创建贴图节点
         texture_node = mat_nodes.new(type='ShaderNodeTexImage')
-        texture_node.image = bpy.data.images.load(texture_path)
+        if texture_match not in bpy.data.images:
+            texture_path = os.path.join(tga_folder_path, texture_match)
+            texture_node.image = bpy.data.images.load(texture_path)
+        else:
+            texture_node.image = bpy.data.images[texture_match]
         texture_node.image.colorspace_settings.name = 'Filmic sRGB'
         texture_node.location = (-400, 0)
+
+        mat.node_tree.nodes.active = texture_node
 
         # 创建 Principled BSDF 节点
         principled_bsdf = mat_nodes.new(type='ShaderNodeBsdfPrincipled')
@@ -120,8 +126,12 @@ def assign_textures_to_objects(obj, folder_path, used_textures):
     obj_name = obj.name
     obj_number = re.search(r'\d+', obj_name)
     obj_number = obj_number.group() if obj_number else None
+    in_match = None
     if obj_number is None:
         return None
+    if obj_number in used_textures.keys():
+        in_match = used_textures.get(obj_number)
+        return in_match
 
     exact_match = None
     fallback_match = None
@@ -130,7 +140,7 @@ def assign_textures_to_objects(obj, folder_path, used_textures):
     for filename in os.listdir(folder_path):
         if not (filename.lower().startswith("d-") and filename.lower().endswith('.tga')):
             continue
-        if filename in used_textures:
+        if filename in used_textures.values():
             continue
 
         before_t = filename.split('t=')[0]
@@ -148,11 +158,11 @@ def assign_textures_to_objects(obj, folder_path, used_textures):
                     fallback_match_count = len(texture_numbers)
 
     if exact_match:
-        used_textures.add(exact_match)
-        return os.path.join(folder_path, exact_match)
+        used_textures[obj_number] = exact_match
+        return exact_match
     elif fallback_match:
-        used_textures.add(fallback_match)
-        return os.path.join(folder_path, fallback_match)
+        used_textures[obj_number] = fallback_match
+        return fallback_match
 
     return None
 
